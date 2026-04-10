@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Passengers Admin</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./config.js"></script>
+    <script defer src="./app.js"></script>
+  </head>
+  <body>
+    <div class="admin-shell">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">Passengers</p>
+          <h1>Admin Console</h1>
+          <p id="environmentBadge" class="environment-badge hidden"></p>
+          <p class="sidebar-copy">
+            Pannello iniziale per la gestione di bikers e passengers tramite sole RPC.
+          </p>
+        </div>
+
+        <nav id="menu" class="menu hidden" aria-label="Sezioni amministrazione">
+          <button class="menu-button is-active" data-section="riders" type="button">
+            Bikers
+          </button>
+          <button class="menu-button" data-section="passengers" type="button">
+            Passengers
+          </button>
+          <button class="menu-button" data-section="illeciti" type="button">
+            Illeciti
+          </button>
+          <button class="menu-button" data-section="blockedUsers" type="button">
+            Utenti Bloccati
+          </button>
+          <button class="menu-button" data-section="telemetry" type="button">
+            Telemetria
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div id="adminIdentity" class="admin-identity hidden"></div>
+          <button id="logoutButton" class="ghost-button hidden" type="button">
+            Logout
+          </button>
+        </div>
+      </aside>
+
+      <main class="content">
+        <section id="loginView" class="panel auth-panel">
+          <div class="panel-header">
+            <p class="eyebrow">Accesso amministrazione</p>
+            <h2>Login</h2>
+            <p>
+              Usa username oppure email di un amministratore registrato in `admin_users` e la password di Supabase Auth.
+            </p>
+          </div>
+
+          <form id="loginForm" class="stack-lg">
+            <label class="field">
+              <span>Username o email</span>
+              <input id="identifierInput" name="identifier" type="text" autocomplete="username" required />
+            </label>
+
+            <label class="field">
+              <span>Password</span>
+              <input id="passwordInput" name="password" type="password" autocomplete="current-password" required />
+            </label>
+
+            <button id="loginButton" class="primary-button" type="submit">Accedi</button>
+          </form>
+        </section>
+
+        <section id="dashboardView" class="hidden stack-lg">
+          <header class="hero panel">
+            <div>
+              <p class="eyebrow">Console amministrazione</p>
+              <h2 id="sectionTitle">Bikers</h2>
+              <p id="sectionDescription">
+                Visualizza l'elenco dei bikers e aggiorna lo stato di blocco tramite RPC.
+              </p>
+            </div>
+            <div class="hero-metric">
+              <span class="metric-label">Elementi</span>
+              <strong id="itemsCount">0</strong>
+            </div>
+          </header>
+
+          <section class="panel stack-md">
+            <div class="toolbar">
+              <label class="field search-field">
+                <span>Cerca</span>
+                <input id="searchInput" type="search" placeholder="Filtra per nickname o email" />
+              </label>
+              <button id="refreshButton" class="ghost-button" type="button">Aggiorna</button>
+            </div>
+
+            <div id="tableState" class="table-state hidden"></div>
+
+            <div id="telemetryPanel" class="telemetry-panel hidden">
+              <div class="telemetry-panel-grid">
+                <label class="field">
+                  <span>Livello minimo remoto</span>
+                  <select id="telemetryLevelSelect" class="field-select">
+                    <option value="off">Off</option>
+                    <option value="error">Solo error</option>
+                    <option value="warning">Warning + error</option>
+                    <option value="info">Info + warning + error</option>
+                  </select>
+                </label>
+
+                <div class="telemetry-meta">
+                  <div class="telemetry-meta-card">
+                    <span class="telemetry-meta-label">Stato attuale</span>
+                    <strong id="telemetryCurrentLevel">-</strong>
+                  </div>
+                  <div class="telemetry-meta-card">
+                    <span class="telemetry-meta-label">Ultimo aggiornamento</span>
+                    <strong id="telemetryUpdatedAt">-</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div class="telemetry-actions">
+                <button id="telemetrySaveButton" class="primary-button" type="button">
+                  Salva soglia log
+                </button>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <div id="flashMessage" class="flash hidden" role="status" aria-live="polite"></div>
+      </main>
+    </div>
+  </body>
+</html>

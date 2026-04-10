@@ -1,0 +1,10 @@
+{
+  "prod": {
+    "supabaseUrl": "https://nqxgffnivddnkyqbntiy.supabase.co",
+    "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xeGdmZm5pdmRkbmt5cWJudGl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0NDc2NzMsImV4cCI6MjA3ODAyMzY3M30.RWE5FmxNbCCAdAwnCzm76HYNz-meaALWkaRoS33wq9A"
+  },
+  "uat": {
+    "supabaseUrl": "https://ggupzjdpqviejwwvdxoj.supabase.co",
+    "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdndXB6amRwcXZpZWp3d3ZkeG9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyMjg5ODgsImV4cCI6MjA5MDgwNDk4OH0.Mi9NCR5Ej9ZMlysznWxYX8_5HahA7RUM_384P5UwEBo"
+  }
+}

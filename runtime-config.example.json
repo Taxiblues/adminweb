@@ -1,0 +1,14 @@
+{
+  "dev": {
+    "supabaseUrl": "http://127.0.0.1:54321",
+    "supabaseAnonKey": "YOUR_LOCAL_SUPABASE_ANON_KEY"
+  },
+  "uat": {
+    "supabaseUrl": "https://YOUR_UAT_PROJECT_ID.supabase.co",
+    "supabaseAnonKey": "YOUR_UAT_SUPABASE_ANON_KEY"
+  },
+  "prod": {
+    "supabaseUrl": "https://YOUR_PROJECT_ID.supabase.co",
+    "supabaseAnonKey": "YOUR_PROD_SUPABASE_ANON_KEY"
+  }
+}
