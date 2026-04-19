@@ -195,6 +195,10 @@
     return `${STORAGE_PREFIX}:${environmentName}:supabaseAnonKey`;
   }
 
+  function getAuthStorageKey(environmentName) {
+    return `${STORAGE_PREFIX}:${environmentName}:auth`;
+  }
+
   function resolveSupabaseUrl(environmentName, runtimeConfig) {
     const params = new URLSearchParams(window.location.search);
     const fromParams = normalizeConfigValue(params.get('supabaseUrl') || '');
@@ -243,6 +247,7 @@
     const environmentName = resolveEnvironmentName();
     const selected = ENVIRONMENTS[environmentName];
     const anonKeyStorageKey = getAnonKeyStorageKey(environmentName);
+    const authStorageKey = getAuthStorageKey(environmentName);
     const runtimeConfig = await loadRuntimeConfig();
 
     return {
@@ -251,6 +256,7 @@
       supabaseUrl: resolveSupabaseUrl(environmentName, runtimeConfig),
       supabaseAnonKey: resolveAnonKey(environmentName, runtimeConfig),
       anonKeyStorageKey,
+      authStorageKey,
       runtimeConfigLoaded: Object.keys(runtimeConfig).length > 0,
     };
   }

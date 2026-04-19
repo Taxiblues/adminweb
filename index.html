@@ -4,10 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Passengers Admin</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260410b" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./config.js"></script>
-    <script defer src="./app.js"></script>
+    <script src="./config.js?v=20260410b"></script>
+    <script defer src="./app.js?v=20260410b"></script>
   </head>
   <body>
     <div class="admin-shell">
@@ -27,6 +27,9 @@
           </button>
           <button class="menu-button" data-section="passengers" type="button">
             Passengers
+          </button>
+          <button class="menu-button" data-section="rides" type="button">
+            Uscite
           </button>
           <button class="menu-button" data-section="illeciti" type="button">
             Illeciti
@@ -94,6 +97,44 @@
                 <input id="searchInput" type="search" placeholder="Filtra per nickname o email" />
               </label>
               <button id="refreshButton" class="ghost-button" type="button">Aggiorna</button>
+            </div>
+
+            <div id="rideFilters" class="ride-filters hidden">
+              <label class="field">
+                <span>Stato uscita</span>
+                <select id="rideStatusFilter" class="field-select">
+                  <option value="">Tutti gli stati</option>
+                  <option value="open">Open</option>
+                  <option value="reserved">Reserved</option>
+                  <option value="closed">Closed</option>
+                  <option value="canceled">Canceled</option>
+                  <option value="completed">Completed</option>
+                  <option value="deleted">Deleted</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Scadenza</span>
+                <select id="rideExpiredFilter" class="field-select">
+                  <option value="all">Tutte</option>
+                  <option value="expired">Scadute</option>
+                  <option value="upcoming">Non scadute</option>
+                </select>
+              </label>
+            </div>
+
+            <div id="bulkActions" class="bulk-actions hidden">
+              <label class="bulk-checkbox">
+                <input id="selectAllRowsCheckbox" type="checkbox" />
+                <span>Seleziona tutte le righe visibili</span>
+              </label>
+
+              <div class="bulk-actions-right">
+                <span id="selectedRowsCount" class="bulk-count">0 selezionate</span>
+                <button id="deleteSelectedButton" class="ghost-button" type="button" disabled>
+                  Elimina selezionate
+                </button>
+              </div>
             </div>
 
             <div id="tableState" class="table-state hidden"></div>

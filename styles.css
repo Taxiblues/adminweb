@@ -290,6 +290,44 @@ select {
   flex: 1;
 }
 
+.ride-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 280px));
+  gap: 16px;
+}
+
+.bulk-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bulk-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.bulk-actions-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.bulk-count {
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .table-wrap {
   overflow: auto;
   border-radius: var(--radius-md);
@@ -362,6 +400,13 @@ td {
   padding: 16px 18px;
   text-align: left;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+th.select-col,
+td.select-col {
+  width: 72px;
+  min-width: 72px;
+  text-align: center;
 }
 
 tbody tr:hover {
@@ -465,11 +510,13 @@ th {
   }
 
   .hero,
-  .toolbar {
+  .toolbar,
+  .bulk-actions {
     flex-direction: column;
     align-items: stretch;
   }
 
+  .ride-filters,
   .telemetry-panel-grid,
   .telemetry-meta {
     grid-template-columns: 1fr;

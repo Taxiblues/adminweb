@@ -15,6 +15,13 @@
   const itemsCount = document.getElementById('itemsCount');
   const searchInput = document.getElementById('searchInput');
   const refreshButton = document.getElementById('refreshButton');
+  const rideFilters = document.getElementById('rideFilters');
+  const rideStatusFilter = document.getElementById('rideStatusFilter');
+  const rideExpiredFilter = document.getElementById('rideExpiredFilter');
+  const bulkActions = document.getElementById('bulkActions');
+  const selectAllRowsCheckbox = document.getElementById('selectAllRowsCheckbox');
+  const selectedRowsCount = document.getElementById('selectedRowsCount');
+  const deleteSelectedButton = document.getElementById('deleteSelectedButton');
   const tableHead = document.getElementById('tableHead');
   const tableBody = document.getElementById('tableBody');
   const tableState = document.getElementById('tableState');
@@ -32,10 +39,16 @@
     activeSection: 'riders',
     riders: [],
     passengers: [],
+    rides: [],
     illeciti: [],
     blockedUsers: [],
     telemetry: null,
     telemetryLogs: [],
+    selectedRideIds: new Set(),
+    rideFilters: {
+      status: '',
+      expired: 'all',
+    },
     search: '',
     loadingSection: false,
   };
@@ -109,13 +122,62 @@
       ],
       searchText: (row) => [row.nickname, row.email],
     },
+    rides: {
+      title: 'Uscite',
+      description:
+        'Elenco uscite con filtri per stato e scadenza, selezione massiva e cancellazione via RPC amministrative.',
+      listRpc: 'admin_list_rides',
+      deleteRpc: 'admin_delete_rides',
+      searchPlaceholder:
+        'Filtra per id, titolo, stato, ruolo proponente, nickname rider, nickname passenger o partenza',
+      rowSelectable: true,
+      columns: [
+        { label: 'Id', value: (row) => row.id || '-' },
+        { label: 'Titolo Uscita', value: (row) => row.title || '-' },
+        {
+          label: 'Stato',
+          render: (row) =>
+            `<span class="pill ${rideStatusClass(row.status)}">${escapeHtml(
+              row.status || '-',
+            )}</span>`,
+        },
+        {
+          label: 'Proposta da',
+          value: (row) => formatUserType(row.proposed_by_role),
+        },
+        { label: 'Nickname rider', value: (row) => row.rider_nickname || '-' },
+        {
+          label: 'Nickname passenger',
+          value: (row) => row.passenger_nickname || '-',
+        },
+        { label: 'Partenza', value: (row) => row.start_location || '-' },
+        { label: 'Data uscita', value: (row) => formatDateTime(row.start_time) },
+        {
+          label: 'Scaduta',
+          render: (row) => {
+            const expired = row.is_expired === true;
+            return `<span class="pill ${expired ? 'is-blocked' : 'is-active'}">${
+              expired ? 'Si' : 'No'
+            }</span>`;
+          },
+        },
+      ],
+      searchText: (row) => [
+        row.id,
+        row.title,
+        row.status,
+        row.proposed_by_role,
+        row.rider_nickname,
+        row.passenger_nickname,
+        row.start_location,
+      ],
+    },
     illeciti: {
       title: 'Illeciti',
       description:
         'Elenco delle segnalazioni illecite con dati di segnalante e segnalato letti tramite RPC.',
       listRpc: 'admin_list_illeciti',
-      searchPlaceholder:
-        'Filtra per nickname, email, tipo utente o note',
+      searchPlaceholder: 'Filtra per nickname, email, tipo utente o note',
       columns: [
         { label: 'Nickname richiedente', value: (row) => row.segnalante_nickname || '-' },
         { label: 'Mail richiedente', value: (row) => row.segnalante_email || '-' },
@@ -143,8 +205,7 @@
       actionRpc: 'admin_delete_user_block',
       actionParam: 'p_id',
       actionSuccessMessage: 'Blocco utente rimosso.',
-      searchPlaceholder:
-        'Filtra per nickname, email, tipo utente o note',
+      searchPlaceholder: 'Filtra per nickname, email, tipo utente o note',
       rowAction: (row) => ({
         label: 'Sblocca',
         className: 'ghost-button',
@@ -192,8 +253,8 @@
               level === 'error'
                 ? 'is-blocked'
                 : level === 'warning'
-                ? 'is-warning'
-                : 'is-active';
+                  ? 'is-warning'
+                  : 'is-active';
             return `<span class="pill ${className}">${escapeHtml(
               level || '-',
             )}</span>`;
@@ -256,16 +317,25 @@
     const meta = sectionMeta[state.activeSection];
     const query = state.search.trim().toLowerCase();
     if (!query) return rows;
-    return rows.filter((row) => {
-      return (meta.searchText ? meta.searchText(row) : [row.nickname, row.email]).some((value) =>
+    return rows.filter((row) =>
+      (meta.searchText ? meta.searchText(row) : [row.nickname, row.email]).some((value) =>
         String(value || '').toLowerCase().includes(query),
-      );
-    });
+      ),
+    );
   }
 
   function renderTableHead(columns) {
     tableHead.innerHTML = '';
     const tr = document.createElement('tr');
+    const meta = sectionMeta[state.activeSection];
+
+    if (meta.rowSelectable) {
+      const th = document.createElement('th');
+      th.className = 'select-col';
+      th.textContent = 'Sel.';
+      tr.appendChild(th);
+    }
+
     columns.forEach((column) => {
       const th = document.createElement('th');
       th.textContent = column.label;
@@ -275,6 +345,34 @@
       tr.appendChild(th);
     });
     tableHead.appendChild(tr);
+  }
+
+  function renderRideControls(rows) {
+    const isRidesSection = state.activeSection === 'rides';
+    rideFilters.classList.toggle('hidden', !isRidesSection);
+    bulkActions.classList.toggle('hidden', !isRidesSection);
+
+    if (!isRidesSection) return;
+
+    rideStatusFilter.value = state.rideFilters.status;
+    rideExpiredFilter.value = state.rideFilters.expired;
+    updateRideBulkActions(rows);
+  }
+
+  function updateRideBulkActions(rows) {
+    if (state.activeSection !== 'rides') return;
+
+    const visibleIds = rows.map((row) => row.id).filter(Boolean);
+    const selectedVisibleCount = visibleIds.filter((id) => state.selectedRideIds.has(id)).length;
+    const selectedCount = state.selectedRideIds.size;
+
+    selectedRowsCount.textContent =
+      selectedCount === 1 ? '1 selezionata' : `${selectedCount} selezionate`;
+    deleteSelectedButton.disabled = selectedCount === 0;
+    selectAllRowsCheckbox.checked =
+      visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
+    selectAllRowsCheckbox.indeterminate =
+      selectedVisibleCount > 0 && selectedVisibleCount < visibleIds.length;
   }
 
   function renderTable() {
@@ -294,6 +392,7 @@
       'hidden',
       meta.hideTable === true,
     );
+    renderRideControls(rows);
 
     if (isTelemetrySection) renderTelemetryPanel();
 
@@ -303,12 +402,14 @@
     if (state.loadingSection) {
       tableState.textContent = 'Caricamento in corso...';
       tableState.classList.remove('hidden');
+      updateRideBulkActions(rows);
       return;
     }
 
     if (!rows.length) {
       tableState.textContent = 'Nessun risultato disponibile per la selezione corrente.';
       tableState.classList.remove('hidden');
+      updateRideBulkActions(rows);
       return;
     }
 
@@ -316,6 +417,25 @@
 
     rows.forEach((row) => {
       const tr = document.createElement('tr');
+
+      if (meta.rowSelectable) {
+        const td = document.createElement('td');
+        td.className = 'select-col';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = state.selectedRideIds.has(row.id);
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) {
+            state.selectedRideIds.add(row.id);
+          } else {
+            state.selectedRideIds.delete(row.id);
+          }
+          updateRideBulkActions(getFilteredRows());
+        });
+        td.appendChild(checkbox);
+        tr.appendChild(td);
+      }
+
       meta.columns.forEach((column) => {
         const td = document.createElement('td');
         if (column.className) {
@@ -345,6 +465,8 @@
 
       tableBody.appendChild(tr);
     });
+
+    updateRideBulkActions(rows);
   }
 
   function formatTelemetryLevel(level) {
@@ -423,8 +545,22 @@
     }
   }
 
+  function buildRideFilterPayload() {
+    const status = String(state.rideFilters.status || '').trim();
+    const expired = String(state.rideFilters.expired || 'all').trim().toLowerCase();
+
+    return {
+      p_status: status || null,
+      p_is_expired:
+        expired === 'expired' ? true : expired === 'upcoming' ? false : null,
+    };
+  }
+
   async function loadSection(sectionName) {
     state.activeSection = sectionName;
+    if (sectionName !== 'rides') {
+      state.selectedRideIds.clear();
+    }
     renderMenu();
     state.loadingSection = true;
     renderTable();
@@ -437,6 +573,14 @@
         ]);
         state.telemetry = settings || null;
         state.telemetryLogs = Array.isArray(rows) ? rows : [];
+      } else if (sectionName === 'rides') {
+        const rows = await callRpc(meta.listRpc, buildRideFilterPayload());
+        state.rides = Array.isArray(rows) ? rows : [];
+        state.selectedRideIds = new Set(
+          Array.from(state.selectedRideIds).filter((id) =>
+            state.rides.some((row) => row.id === id),
+          ),
+        );
       } else {
         const rows = await callRpc(meta.listRpc);
         state[sectionName] = Array.isArray(rows) ? rows : [];
@@ -482,6 +626,39 @@
     }
   }
 
+  async function deleteSelectedRides() {
+    const rideIds = Array.from(state.selectedRideIds);
+    if (!rideIds.length) return;
+
+    const confirmed = window.confirm(
+      rideIds.length === 1
+        ? 'Confermi la cancellazione dell\'uscita selezionata?'
+        : `Confermi la cancellazione di ${rideIds.length} uscite selezionate?`,
+    );
+    if (!confirmed) return;
+
+    deleteSelectedButton.disabled = true;
+    deleteSelectedButton.textContent = 'Eliminazione...';
+
+    try {
+      const result = await callRpc(sectionMeta.rides.deleteRpc, {
+        p_ride_ids: rideIds,
+      });
+      const deleted = Number(result && result.deleted ? result.deleted : 0);
+      state.selectedRideIds.clear();
+      showFlash(
+        deleted === 1 ? '1 uscita eliminata.' : `${deleted} uscite eliminate.`,
+        'success',
+      );
+      await loadSection('rides');
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    } finally {
+      deleteSelectedButton.textContent = 'Elimina selezionate';
+      deleteSelectedButton.disabled = state.selectedRideIds.size === 0;
+    }
+  }
+
   async function saveTelemetrySettings() {
     const meta = sectionMeta.telemetry;
     const level = telemetryLevelSelect.value;
@@ -507,6 +684,10 @@
 
   async function handleLogin(event) {
     event.preventDefault();
+    if (!state.supabase) {
+      showFlash('Config admin non pronta per l\'ambiente selezionato.', 'error');
+      return;
+    }
     const identifier = identifierInput.value.trim();
     const password = passwordInput.value;
 
@@ -549,6 +730,10 @@
   }
 
   async function handleLogout() {
+    if (!state.supabase) {
+      renderSignedOut();
+      return;
+    }
     await state.supabase.auth.signOut();
     state.session = null;
     state.admin = null;
@@ -587,6 +772,17 @@
     return normalized || '-';
   }
 
+  function rideStatusClass(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'open' || normalized === 'reserved' || normalized === 'closed') {
+      return 'is-active';
+    }
+    if (normalized === 'completed') {
+      return 'is-warning';
+    }
+    return 'is-blocked';
+  }
+
   function escapeHtml(value) {
     return String(value)
       .replace(/&/g, '&amp;')
@@ -604,6 +800,27 @@
       state.search = event.target.value;
       renderTable();
     });
+    rideStatusFilter.addEventListener('change', (event) => {
+      state.rideFilters.status = event.target.value;
+      state.selectedRideIds.clear();
+      loadSection('rides');
+    });
+    rideExpiredFilter.addEventListener('change', (event) => {
+      state.rideFilters.expired = event.target.value;
+      state.selectedRideIds.clear();
+      loadSection('rides');
+    });
+    selectAllRowsCheckbox.addEventListener('change', () => {
+      if (state.activeSection !== 'rides') return;
+      const visibleIds = getFilteredRows().map((row) => row.id).filter(Boolean);
+      if (selectAllRowsCheckbox.checked) {
+        visibleIds.forEach((id) => state.selectedRideIds.add(id));
+      } else {
+        visibleIds.forEach((id) => state.selectedRideIds.delete(id));
+      }
+      renderTable();
+    });
+    deleteSelectedButton.addEventListener('click', deleteSelectedRides);
     menu.addEventListener('click', (event) => {
       const button = event.target.closest('.menu-button');
       if (!button) return;
@@ -633,7 +850,11 @@
     const supabaseUrl = (config.supabaseUrl || '').trim();
     const supabaseAnonKey = (config.supabaseAnonKey || '').trim();
     const anonKeyStorageKey = (config.anonKeyStorageKey || '').trim();
-    const environmentName = (config.environment || 'prod').trim();
+    const authStorageKey = (config.authStorageKey || '').trim();
+
+    attachEvents();
+    renderEnvironmentBadge();
+    renderSignedOut();
 
     if (!supabaseUrl || !supabaseAnonKey) {
       const storageHint = anonKeyStorageKey
@@ -651,12 +872,9 @@
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
+        storageKey: authStorageKey || undefined,
       },
     });
-
-    attachEvents();
-    renderEnvironmentBadge();
-    renderSignedOut();
 
     const hasContext = await ensureAdminContext();
     if (hasContext) {
