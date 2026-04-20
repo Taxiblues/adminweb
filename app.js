@@ -53,6 +53,65 @@
     loadingSection: false,
   };
 
+  const authSessionStorage = createScopedSessionStorage();
+
+  function createScopedSessionStorage() {
+    const memoryFallback = new Map();
+
+    function read(store, key) {
+      return store.getItem(key);
+    }
+
+    function write(store, key, value) {
+      store.setItem(key, value);
+    }
+
+    function remove(store, key) {
+      store.removeItem(key);
+    }
+
+    return {
+      getItem(key) {
+        try {
+          return read(window.sessionStorage, key);
+        } catch (_) {
+          return memoryFallback.has(key) ? memoryFallback.get(key) : null;
+        }
+      },
+      setItem(key, value) {
+        try {
+          write(window.sessionStorage, key, value);
+        } catch (_) {
+          memoryFallback.set(key, value);
+        }
+      },
+      removeItem(key) {
+        try {
+          remove(window.sessionStorage, key);
+        } catch (_) {
+          memoryFallback.delete(key);
+        }
+      },
+    };
+  }
+
+  function stripSensitiveLoginParams() {
+    const currentUrl = new URL(window.location.href);
+    const sensitiveParams = ['identifier', 'username', 'email', 'password'];
+    let changed = false;
+
+    sensitiveParams.forEach((name) => {
+      if (currentUrl.searchParams.has(name)) {
+        currentUrl.searchParams.delete(name);
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      window.history.replaceState({}, document.title, currentUrl.toString());
+    }
+  }
+
   function getConfig() {
     return state.config || {};
   }
@@ -747,6 +806,7 @@
     menu.classList.add('hidden');
     logoutButton.classList.add('hidden');
     adminIdentity.classList.add('hidden');
+    passwordInput.value = '';
   }
 
   function renderSignedIn() {
@@ -841,6 +901,8 @@
   }
 
   async function bootstrap() {
+    stripSensitiveLoginParams();
+
     state.config = await (
       window.PASSENGERS_ADMIN_CONFIG_PROMISE ||
       Promise.resolve(window.PASSENGERS_ADMIN_CONFIG || {})
@@ -873,6 +935,7 @@
         autoRefreshToken: true,
         detectSessionInUrl: true,
         storageKey: authStorageKey || undefined,
+        storage: authSessionStorage,
       },
     });
 

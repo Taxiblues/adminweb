@@ -3,6 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co; font-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      http-equiv="Cache-Control"
+      content="no-store, no-cache, must-revalidate, max-age=0"
+    />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>Passengers Admin</title>
     <link rel="stylesheet" href="./styles.css?v=20260410b" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -60,15 +71,36 @@
             </p>
           </div>
 
-          <form id="loginForm" class="stack-lg">
+          <form
+            id="loginForm"
+            class="stack-lg"
+            method="post"
+            action="./"
+            autocomplete="off"
+          >
             <label class="field">
               <span>Username o email</span>
-              <input id="identifierInput" name="identifier" type="text" autocomplete="username" required />
+              <input
+                id="identifierInput"
+                name="identifier"
+                type="text"
+                autocomplete="username"
+                autocapitalize="none"
+                autocorrect="off"
+                spellcheck="false"
+                required
+              />
             </label>
 
             <label class="field">
               <span>Password</span>
-              <input id="passwordInput" name="password" type="password" autocomplete="current-password" required />
+              <input
+                id="passwordInput"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                required
+              />
             </label>
 
             <button id="loginButton" class="primary-button" type="submit">Accedi</button>
