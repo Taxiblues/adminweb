@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co; font-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co http://127.0.0.1:54321 http://localhost:54321 ws://127.0.0.1:54321 ws://localhost:54321; font-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
     />
     <meta name="referrer" content="no-referrer" />
     <meta
@@ -50,6 +50,9 @@
           </button>
           <button class="menu-button" data-section="telemetry" type="button">
             Telemetria
+          </button>
+          <button class="menu-button" data-section="appUpdates" type="button">
+            Aggiornamenti App
           </button>
         </nav>
 
@@ -198,6 +201,106 @@
               <div class="telemetry-actions">
                 <button id="telemetrySaveButton" class="primary-button" type="button">
                   Salva soglia log
+                </button>
+              </div>
+            </div>
+
+            <div id="appUpdatePanel" class="app-update-panel hidden">
+              <div class="app-update-header">
+                <label class="toggle-field">
+                  <input id="appUpdateForceToggle" type="checkbox" />
+                  <span>Forza l'aggiornamento quando la build installata e inferiore alla build consigliata</span>
+                </label>
+
+                <div class="telemetry-meta">
+                  <div class="telemetry-meta-card">
+                    <span class="telemetry-meta-label">Stato attuale</span>
+                    <strong id="appUpdateCurrentMode">-</strong>
+                  </div>
+                  <div class="telemetry-meta-card">
+                    <span class="telemetry-meta-label">Ultimo aggiornamento</span>
+                    <strong id="appUpdateUpdatedAt">-</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div class="app-update-message-grid">
+                <label class="field">
+                  <span>Titolo messaggio</span>
+                  <input id="appUpdateTitleInput" type="text" maxlength="120" />
+                </label>
+
+                <label class="field">
+                  <span>Messaggio utente</span>
+                  <textarea id="appUpdateBodyInput" rows="4"></textarea>
+                </label>
+              </div>
+
+              <div class="app-update-grid">
+                <div class="app-update-platform-card">
+                  <p class="eyebrow">Android</p>
+                  <div class="app-update-platform-fields">
+                    <label class="field">
+                      <span>Build minima supportata</span>
+                      <input id="androidMinBuildInput" type="number" min="0" step="1" />
+                    </label>
+                    <label class="field">
+                      <span>Versione minima supportata</span>
+                      <input id="androidMinVersionInput" type="text" placeholder="es. 1.0.2" />
+                    </label>
+                    <label class="field">
+                      <span>Build consigliata</span>
+                      <input id="androidLatestBuildInput" type="number" min="0" step="1" />
+                    </label>
+                    <label class="field">
+                      <span>Versione consigliata</span>
+                      <input id="androidLatestVersionInput" type="text" placeholder="es. 1.0.3" />
+                    </label>
+                    <label class="field app-update-url-field">
+                      <span>URL Store Android</span>
+                      <input
+                        id="androidStoreUrlInput"
+                        type="url"
+                        placeholder="https://play.google.com/store/apps/details?id=com.taxiblues.passengers"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div class="app-update-platform-card">
+                  <p class="eyebrow">iPhone</p>
+                  <div class="app-update-platform-fields">
+                    <label class="field">
+                      <span>Build minima supportata</span>
+                      <input id="iosMinBuildInput" type="number" min="0" step="1" />
+                    </label>
+                    <label class="field">
+                      <span>Versione minima supportata</span>
+                      <input id="iosMinVersionInput" type="text" placeholder="es. 1.0.2" />
+                    </label>
+                    <label class="field">
+                      <span>Build consigliata</span>
+                      <input id="iosLatestBuildInput" type="number" min="0" step="1" />
+                    </label>
+                    <label class="field">
+                      <span>Versione consigliata</span>
+                      <input id="iosLatestVersionInput" type="text" placeholder="es. 1.0.3" />
+                    </label>
+                    <label class="field app-update-url-field">
+                      <span>URL App Store iOS</span>
+                      <input
+                        id="iosStoreUrlInput"
+                        type="url"
+                        placeholder="https://apps.apple.com/app/id1234567890"
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="telemetry-actions">
+                <button id="appUpdateSaveButton" class="primary-button" type="button">
+                  Salva configurazione update
                 </button>
               </div>
             </div>

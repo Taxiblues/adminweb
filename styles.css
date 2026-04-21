@@ -39,7 +39,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -231,6 +232,23 @@ select {
   box-shadow: 0 0 0 3px rgba(243, 154, 45, 0.14);
 }
 
+.field textarea {
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid var(--panel-border);
+  background: #1b1b1b;
+  color: var(--text);
+  min-height: 120px;
+  padding: 14px 18px;
+  outline: none;
+  resize: vertical;
+}
+
+.field textarea:focus {
+  border-color: rgba(243, 154, 45, 0.7);
+  box-shadow: 0 0 0 3px rgba(243, 154, 45, 0.14);
+}
+
 .field-select {
   width: 100%;
   border-radius: 18px;
@@ -334,7 +352,8 @@ select {
   border: 1px solid var(--panel-border);
 }
 
-.telemetry-panel {
+.telemetry-panel,
+.app-update-panel {
   display: grid;
   gap: 22px;
   padding: 22px;
@@ -345,11 +364,61 @@ select {
     rgba(255, 255, 255, 0.02);
 }
 
-.telemetry-panel-grid {
+.telemetry-panel-grid,
+.app-update-grid {
   display: grid;
   grid-template-columns: minmax(260px, 420px) minmax(0, 1fr);
   gap: 20px;
   align-items: end;
+}
+
+.app-update-header {
+  display: grid;
+  gap: 20px;
+}
+
+.toggle-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.toggle-field input {
+  width: 18px;
+  height: 18px;
+}
+
+.app-update-message-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.app-update-platform-card {
+  display: grid;
+  gap: 16px;
+  min-height: 100%;
+  padding: 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.app-update-platform-card .eyebrow {
+  margin-bottom: 0;
+}
+
+.app-update-platform-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.app-update-url-field {
+  grid-column: 1 / -1;
 }
 
 .telemetry-meta {
@@ -518,7 +587,10 @@ th {
 
   .ride-filters,
   .telemetry-panel-grid,
-  .telemetry-meta {
+  .telemetry-meta,
+  .app-update-grid,
+  .app-update-message-grid,
+  .app-update-platform-fields {
     grid-template-columns: 1fr;
   }
 

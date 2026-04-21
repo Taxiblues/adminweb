@@ -30,6 +30,23 @@
   const telemetryCurrentLevel = document.getElementById('telemetryCurrentLevel');
   const telemetryUpdatedAt = document.getElementById('telemetryUpdatedAt');
   const telemetrySaveButton = document.getElementById('telemetrySaveButton');
+  const appUpdatePanel = document.getElementById('appUpdatePanel');
+  const appUpdateForceToggle = document.getElementById('appUpdateForceToggle');
+  const appUpdateCurrentMode = document.getElementById('appUpdateCurrentMode');
+  const appUpdateUpdatedAt = document.getElementById('appUpdateUpdatedAt');
+  const appUpdateTitleInput = document.getElementById('appUpdateTitleInput');
+  const appUpdateBodyInput = document.getElementById('appUpdateBodyInput');
+  const androidMinBuildInput = document.getElementById('androidMinBuildInput');
+  const androidMinVersionInput = document.getElementById('androidMinVersionInput');
+  const androidLatestBuildInput = document.getElementById('androidLatestBuildInput');
+  const androidLatestVersionInput = document.getElementById('androidLatestVersionInput');
+  const androidStoreUrlInput = document.getElementById('androidStoreUrlInput');
+  const iosMinBuildInput = document.getElementById('iosMinBuildInput');
+  const iosMinVersionInput = document.getElementById('iosMinVersionInput');
+  const iosLatestBuildInput = document.getElementById('iosLatestBuildInput');
+  const iosLatestVersionInput = document.getElementById('iosLatestVersionInput');
+  const iosStoreUrlInput = document.getElementById('iosStoreUrlInput');
+  const appUpdateSaveButton = document.getElementById('appUpdateSaveButton');
 
   const state = {
     supabase: null,
@@ -44,6 +61,7 @@
     blockedUsers: [],
     telemetry: null,
     telemetryLogs: [],
+    appUpdateSettings: null,
     selectedRideIds: new Set(),
     rideFilters: {
       status: '',
@@ -343,6 +361,17 @@
         row.source,
       ],
     },
+    appUpdates: {
+      title: 'Aggiornamenti App',
+      description:
+        'Configura per piattaforma la versione minima supportata, la versione consigliata e il link diretto allo store.',
+      getRpc: 'admin_get_app_update_settings',
+      updateRpc: 'admin_update_app_update_settings',
+      hideSearch: true,
+      hideTable: true,
+      metricValue: () => 1,
+      columns: [],
+    },
   };
 
   function showFlash(message, variant) {
@@ -437,6 +466,7 @@
   function renderTable() {
     const meta = sectionMeta[state.activeSection];
     const isTelemetrySection = state.activeSection === 'telemetry';
+    const isAppUpdatesSection = state.activeSection === 'appUpdates';
     const rows = getFilteredRows();
 
     sectionTitle.textContent = meta.title;
@@ -447,6 +477,7 @@
     );
     searchInput.closest('.field').classList.toggle('hidden', meta.hideSearch === true);
     telemetryPanel.classList.toggle('hidden', !isTelemetrySection);
+    appUpdatePanel.classList.toggle('hidden', !isAppUpdatesSection);
     tableHead.parentElement.parentElement.classList.toggle(
       'hidden',
       meta.hideTable === true,
@@ -454,6 +485,15 @@
     renderRideControls(rows);
 
     if (isTelemetrySection) renderTelemetryPanel();
+    if (isAppUpdatesSection) renderAppUpdatePanel();
+
+    if (meta.hideTable === true) {
+      tableHead.innerHTML = '';
+      tableBody.innerHTML = '';
+      tableState.classList.add('hidden');
+      updateRideBulkActions(rows);
+      return;
+    }
 
     renderTableHead(meta.columns);
     tableBody.innerHTML = '';
@@ -573,6 +613,34 @@
     telemetryUpdatedAt.textContent = formatDateTime(settings.updated_at);
   }
 
+  function renderAppUpdatePanel() {
+    const settings = state.appUpdateSettings || {};
+    appUpdateForceToggle.checked = settings.force_update === true;
+    appUpdateCurrentMode.textContent = settings.force_update === true ? 'Blocco attivo' : 'Solo suggerimento';
+    appUpdateUpdatedAt.textContent = formatDateTime(settings.updated_at);
+    appUpdateTitleInput.value = settings.message_title || 'Aggiornamento disponibile';
+    appUpdateBodyInput.value =
+      settings.message_body ||
+      'E disponibile una nuova versione dell\'app. Aggiorna per continuare con miglioramenti e correzioni.';
+    androidMinBuildInput.value = settings.android_min_supported_build ?? '';
+    androidMinVersionInput.value = settings.android_min_supported_version || '';
+    androidLatestBuildInput.value = settings.android_latest_recommended_build ?? '';
+    androidLatestVersionInput.value = settings.android_latest_recommended_version || '';
+    androidStoreUrlInput.value = settings.android_store_url || '';
+    iosMinBuildInput.value = settings.ios_min_supported_build ?? '';
+    iosMinVersionInput.value = settings.ios_min_supported_version || '';
+    iosLatestBuildInput.value = settings.ios_latest_recommended_build ?? '';
+    iosLatestVersionInput.value = settings.ios_latest_recommended_version || '';
+    iosStoreUrlInput.value = settings.ios_store_url || '';
+  }
+
+  function parseOptionalIntegerInput(value) {
+    const normalized = String(value || '').trim();
+    if (!normalized) return null;
+    const parsed = Number.parseInt(normalized, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
   async function callRpc(name, params) {
     const { data, error } = await state.supabase.rpc(name, params || {});
     if (error) throw error;
@@ -632,6 +700,9 @@
         ]);
         state.telemetry = settings || null;
         state.telemetryLogs = Array.isArray(rows) ? rows : [];
+      } else if (sectionName === 'appUpdates') {
+        const settings = await callRpc(meta.getRpc);
+        state.appUpdateSettings = settings || null;
       } else if (sectionName === 'rides') {
         const rows = await callRpc(meta.listRpc, buildRideFilterPayload());
         state.rides = Array.isArray(rows) ? rows : [];
@@ -738,6 +809,43 @@
     } finally {
       telemetrySaveButton.disabled = false;
       telemetrySaveButton.textContent = 'Salva soglia log';
+    }
+  }
+
+  async function saveAppUpdateSettings() {
+    const meta = sectionMeta.appUpdates;
+    appUpdateSaveButton.disabled = true;
+    appUpdateSaveButton.textContent = 'Salvataggio...';
+
+    try {
+      const updated = await callRpc(meta.updateRpc, {
+        p_force_update: appUpdateForceToggle.checked,
+        p_message_title: appUpdateTitleInput.value.trim(),
+        p_message_body: appUpdateBodyInput.value.trim(),
+        p_android_min_supported_build: parseOptionalIntegerInput(androidMinBuildInput.value),
+        p_android_min_supported_version: androidMinVersionInput.value.trim() || null,
+        p_android_latest_recommended_build: parseOptionalIntegerInput(
+          androidLatestBuildInput.value,
+        ),
+        p_android_latest_recommended_version:
+          androidLatestVersionInput.value.trim() || null,
+        p_android_store_url: androidStoreUrlInput.value.trim() || null,
+        p_ios_min_supported_build: parseOptionalIntegerInput(iosMinBuildInput.value),
+        p_ios_min_supported_version: iosMinVersionInput.value.trim() || null,
+        p_ios_latest_recommended_build: parseOptionalIntegerInput(
+          iosLatestBuildInput.value,
+        ),
+        p_ios_latest_recommended_version: iosLatestVersionInput.value.trim() || null,
+        p_ios_store_url: iosStoreUrlInput.value.trim() || null,
+      });
+      state.appUpdateSettings = updated || null;
+      renderAppUpdatePanel();
+      showFlash('Configurazione aggiornamenti salvata.', 'success');
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    } finally {
+      appUpdateSaveButton.disabled = false;
+      appUpdateSaveButton.textContent = 'Salva configurazione update';
     }
   }
 
@@ -889,6 +997,7 @@
       loadSection(sectionName);
     });
     telemetrySaveButton.addEventListener('click', saveTelemetrySettings);
+    appUpdateSaveButton.addEventListener('click', saveAppUpdateSettings);
   }
 
   function renderEnvironmentBadge() {
