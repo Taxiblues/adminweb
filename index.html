@@ -15,10 +15,10 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>Passengers Admin</title>
-    <link rel="stylesheet" href="./styles.css?v=20260410b" />
+    <link rel="stylesheet" href="./styles.css?v=20260422a" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./config.js?v=20260410b"></script>
-    <script defer src="./app.js?v=20260410b"></script>
+    <script src="./config.js?v=20260422a"></script>
+    <script defer src="./app.js?v=20260422a"></script>
   </head>
   <body>
     <div class="admin-shell">
@@ -33,6 +33,9 @@
         </div>
 
         <nav id="menu" class="menu hidden" aria-label="Sezioni amministrazione">
+          <button class="menu-button" data-section="summary" type="button">
+            Summary
+          </button>
           <button class="menu-button is-active" data-section="riders" type="button">
             Bikers
           </button>
@@ -303,6 +306,10 @@
                   Salva configurazione update
                 </button>
               </div>
+            </div>
+
+            <div id="summaryPanel" class="summary-panel hidden">
+              <div id="summaryGrid" class="summary-grid"></div>
             </div>
 
             <div class="table-wrap">

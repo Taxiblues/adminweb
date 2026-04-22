@@ -353,7 +353,8 @@ textarea {
 }
 
 .telemetry-panel,
-.app-update-panel {
+.app-update-panel,
+.summary-panel {
   display: grid;
   gap: 22px;
   padding: 22px;
@@ -452,6 +453,42 @@ textarea {
 .telemetry-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.summary-tile {
+  display: grid;
+  gap: 14px;
+  min-height: 154px;
+  padding: 20px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--panel-border);
+  background:
+    radial-gradient(circle at top right, rgba(243, 154, 45, 0.16), transparent 44%),
+    rgba(255, 255, 255, 0.03);
+}
+
+.summary-tile-label {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.summary-tile-value {
+  font-size: clamp(30px, 4vw, 42px);
+  line-height: 1;
+  font-weight: 700;
+}
+
+.summary-tile-note {
+  font-size: 13px;
+  color: var(--muted);
 }
 
 table {
@@ -590,7 +627,8 @@ th {
   .telemetry-meta,
   .app-update-grid,
   .app-update-message-grid,
-  .app-update-platform-fields {
+  .app-update-platform-fields,
+  .summary-grid {
     grid-template-columns: 1fr;
   }
 

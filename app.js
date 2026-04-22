@@ -25,6 +25,8 @@
   const tableHead = document.getElementById('tableHead');
   const tableBody = document.getElementById('tableBody');
   const tableState = document.getElementById('tableState');
+  const summaryPanel = document.getElementById('summaryPanel');
+  const summaryGrid = document.getElementById('summaryGrid');
   const telemetryPanel = document.getElementById('telemetryPanel');
   const telemetryLevelSelect = document.getElementById('telemetryLevelSelect');
   const telemetryCurrentLevel = document.getElementById('telemetryCurrentLevel');
@@ -59,10 +61,11 @@
     rides: [],
     illeciti: [],
     blockedUsers: [],
+    summary: null,
     telemetry: null,
     telemetryLogs: [],
     appUpdateSettings: null,
-    selectedRideIds: new Set(),
+    selectedRowIds: new Set(),
     rideFilters: {
       status: '',
       expired: 'all',
@@ -135,6 +138,16 @@
   }
 
   const sectionMeta = {
+    summary: {
+      title: 'Summary',
+      description:
+        'Sintesi rapida dei principali indicatori operativi dell’app.',
+      getRpc: 'admin_get_summary',
+      hideSearch: true,
+      hideTable: true,
+      metricValue: () => 7,
+      columns: [],
+    },
     riders: {
       title: 'Bikers',
       description:
@@ -205,6 +218,7 @@
         'Elenco uscite con filtri per stato e scadenza, selezione massiva e cancellazione via RPC amministrative.',
       listRpc: 'admin_list_rides',
       deleteRpc: 'admin_delete_rides',
+      deleteParam: 'p_ride_ids',
       searchPlaceholder:
         'Filtra per id, titolo, stato, ruolo proponente, nickname rider, nickname passenger o partenza',
       rowSelectable: true,
@@ -254,6 +268,16 @@
       description:
         'Elenco delle segnalazioni illecite con dati di segnalante e segnalato letti tramite RPC.',
       listRpc: 'admin_list_illeciti',
+      deleteRpc: 'admin_delete_illeciti',
+      deleteParam: 'p_ids',
+      rowSelectable: true,
+      deleteConfirmSingular: 'Confermi la cancellazione della segnalazione selezionata?',
+      deleteConfirmPlural: (count) =>
+        `Confermi la cancellazione di ${count} segnalazioni selezionate?`,
+      deleteButtonLabel: 'Elimina selezionate',
+      deleteProgressLabel: 'Eliminazione...',
+      deleteSuccessSingular: '1 segnalazione eliminata.',
+      deleteSuccessPlural: (count) => `${count} segnalazioni eliminate.`,
       searchPlaceholder: 'Filtra per nickname, email, tipo utente o note',
       columns: [
         { label: 'Nickname richiedente', value: (row) => row.segnalante_nickname || '-' },
@@ -315,10 +339,21 @@
       getRpc: 'admin_get_app_telemetry_settings',
       listRpc: 'admin_list_app_telemetry_events',
       updateRpc: 'admin_update_app_telemetry_settings',
+      deleteRpc: 'admin_delete_app_telemetry_events',
+      deleteParam: 'p_ids',
       dataKey: 'telemetryLogs',
+      rowSelectable: true,
+      deleteConfirmSingular: 'Confermi la cancellazione dell\'evento telemetria selezionato?',
+      deleteConfirmPlural: (count) =>
+        `Confermi la cancellazione di ${count} eventi telemetria selezionati?`,
+      deleteButtonLabel: 'Elimina selezionate',
+      deleteProgressLabel: 'Eliminazione...',
+      deleteSuccessSingular: '1 evento telemetria eliminato.',
+      deleteSuccessPlural: (count) => `${count} eventi telemetria eliminati.`,
       searchPlaceholder:
         'Filtra per user id, nickname, email, level, tag, message o details',
       columns: [
+        { label: 'Id', value: (row) => row.id || '-' },
         { label: 'Id Utente', value: (row) => row.user_id || '-' },
         { label: 'Nickname', value: (row) => row.nickname || '-' },
         { label: 'Mail', value: (row) => row.email || '-' },
@@ -348,8 +383,10 @@
         },
         { label: 'Client Platform', value: (row) => row.client_platform || '-' },
         { label: 'Source', value: (row) => row.source || '-' },
+        { label: 'Creato il', value: (row) => formatDateTime(row.created_at) },
       ],
       searchText: (row) => [
+        row.id,
         row.user_id,
         row.nickname,
         row.email,
@@ -412,6 +449,10 @@
     );
   }
 
+  function getRowId(row) {
+    return row && row.id != null ? row.id : null;
+  }
+
   function renderTableHead(columns) {
     tableHead.innerHTML = '';
     const tr = document.createElement('tr');
@@ -435,28 +476,40 @@
     tableHead.appendChild(tr);
   }
 
-  function renderRideControls(rows) {
+  function renderSectionControls(rows) {
+    const meta = sectionMeta[state.activeSection];
     const isRidesSection = state.activeSection === 'rides';
+    const supportsBulkActions = meta.rowSelectable === true;
     rideFilters.classList.toggle('hidden', !isRidesSection);
-    bulkActions.classList.toggle('hidden', !isRidesSection);
+    bulkActions.classList.toggle('hidden', !supportsBulkActions);
 
-    if (!isRidesSection) return;
+    if (isRidesSection) {
+      rideStatusFilter.value = state.rideFilters.status;
+      rideExpiredFilter.value = state.rideFilters.expired;
+    }
 
-    rideStatusFilter.value = state.rideFilters.status;
-    rideExpiredFilter.value = state.rideFilters.expired;
-    updateRideBulkActions(rows);
+    updateSelectionBulkActions(rows);
   }
 
-  function updateRideBulkActions(rows) {
-    if (state.activeSection !== 'rides') return;
+  function updateSelectionBulkActions(rows) {
+    const meta = sectionMeta[state.activeSection];
+    if (meta.rowSelectable !== true) {
+      selectedRowsCount.textContent = '0 selezionate';
+      deleteSelectedButton.disabled = true;
+      selectAllRowsCheckbox.checked = false;
+      selectAllRowsCheckbox.indeterminate = false;
+      return;
+    }
 
-    const visibleIds = rows.map((row) => row.id).filter(Boolean);
-    const selectedVisibleCount = visibleIds.filter((id) => state.selectedRideIds.has(id)).length;
-    const selectedCount = state.selectedRideIds.size;
+    const visibleIds = rows.map((row) => getRowId(row)).filter((id) => id != null);
+    const selectedVisibleCount = visibleIds.filter((id) => state.selectedRowIds.has(id)).length;
+    const selectedCount = state.selectedRowIds.size;
+    const deleteButtonLabel = meta.deleteButtonLabel || 'Elimina selezionate';
 
     selectedRowsCount.textContent =
       selectedCount === 1 ? '1 selezionata' : `${selectedCount} selezionate`;
     deleteSelectedButton.disabled = selectedCount === 0;
+    deleteSelectedButton.textContent = deleteButtonLabel;
     selectAllRowsCheckbox.checked =
       visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
     selectAllRowsCheckbox.indeterminate =
@@ -465,6 +518,7 @@
 
   function renderTable() {
     const meta = sectionMeta[state.activeSection];
+    const isSummarySection = state.activeSection === 'summary';
     const isTelemetrySection = state.activeSection === 'telemetry';
     const isAppUpdatesSection = state.activeSection === 'appUpdates';
     const rows = getFilteredRows();
@@ -476,14 +530,16 @@
       typeof meta.metricValue === 'function' ? meta.metricValue() : rows.length,
     );
     searchInput.closest('.field').classList.toggle('hidden', meta.hideSearch === true);
+    summaryPanel.classList.toggle('hidden', !isSummarySection);
     telemetryPanel.classList.toggle('hidden', !isTelemetrySection);
     appUpdatePanel.classList.toggle('hidden', !isAppUpdatesSection);
     tableHead.parentElement.parentElement.classList.toggle(
       'hidden',
       meta.hideTable === true,
     );
-    renderRideControls(rows);
+    renderSectionControls(rows);
 
+    if (isSummarySection) renderSummaryPanel();
     if (isTelemetrySection) renderTelemetryPanel();
     if (isAppUpdatesSection) renderAppUpdatePanel();
 
@@ -491,7 +547,7 @@
       tableHead.innerHTML = '';
       tableBody.innerHTML = '';
       tableState.classList.add('hidden');
-      updateRideBulkActions(rows);
+      updateSelectionBulkActions(rows);
       return;
     }
 
@@ -501,14 +557,14 @@
     if (state.loadingSection) {
       tableState.textContent = 'Caricamento in corso...';
       tableState.classList.remove('hidden');
-      updateRideBulkActions(rows);
+      updateSelectionBulkActions(rows);
       return;
     }
 
     if (!rows.length) {
       tableState.textContent = 'Nessun risultato disponibile per la selezione corrente.';
       tableState.classList.remove('hidden');
-      updateRideBulkActions(rows);
+      updateSelectionBulkActions(rows);
       return;
     }
 
@@ -522,14 +578,15 @@
         td.className = 'select-col';
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
-        checkbox.checked = state.selectedRideIds.has(row.id);
+        const rowId = getRowId(row);
+        checkbox.checked = state.selectedRowIds.has(rowId);
         checkbox.addEventListener('change', () => {
           if (checkbox.checked) {
-            state.selectedRideIds.add(row.id);
+            state.selectedRowIds.add(rowId);
           } else {
-            state.selectedRideIds.delete(row.id);
+            state.selectedRowIds.delete(rowId);
           }
-          updateRideBulkActions(getFilteredRows());
+          updateSelectionBulkActions(getFilteredRows());
         });
         td.appendChild(checkbox);
         tr.appendChild(td);
@@ -565,7 +622,60 @@
       tableBody.appendChild(tr);
     });
 
-    updateRideBulkActions(rows);
+    updateSelectionBulkActions(rows);
+  }
+
+  function renderSummaryPanel() {
+    const summary = state.summary || {};
+    const tiles = [
+      {
+        label: 'Numero di Biker registrati',
+        value: summary.bikers_registered ?? 0,
+        note: 'Totale profili biker presenti in app',
+      },
+      {
+        label: 'Numero di Passengers registrati',
+        value: summary.passengers_registered ?? 0,
+        note: 'Totale profili passenger presenti in app',
+      },
+      {
+        label: 'Numero di uscite aperte',
+        value: summary.rides_open ?? 0,
+        note: 'Record in rides con status = open',
+      },
+      {
+        label: 'Numero di uscite prenotate',
+        value: summary.rides_completed ?? 0,
+        note: 'Record in rides con status = completed',
+      },
+      {
+        label: 'Numero uscite cancellate',
+        value: summary.rides_deleted ?? 0,
+        note: 'Record in rides con status = deleted',
+      },
+      {
+        label: 'Numero utenti bloccati',
+        value: summary.blocked_users ?? 0,
+        note: 'Utenti con profilo amministrativamente bloccato',
+      },
+      {
+        label: 'Numero illeciti',
+        value: summary.illeciti_total ?? 0,
+        note: 'Segnalazioni illecite registrate',
+      },
+    ];
+
+    summaryGrid.innerHTML = '';
+    tiles.forEach((tile) => {
+      const article = document.createElement('article');
+      article.className = 'summary-tile';
+      article.innerHTML = `
+        <span class="summary-tile-label">${escapeHtml(tile.label)}</span>
+        <strong class="summary-tile-value">${escapeHtml(tile.value)}</strong>
+        <span class="summary-tile-note">${escapeHtml(tile.note)}</span>
+      `;
+      summaryGrid.appendChild(article);
+    });
   }
 
   function formatTelemetryLevel(level) {
@@ -685,15 +795,16 @@
 
   async function loadSection(sectionName) {
     state.activeSection = sectionName;
-    if (sectionName !== 'rides') {
-      state.selectedRideIds.clear();
-    }
+    state.selectedRowIds.clear();
     renderMenu();
     state.loadingSection = true;
     renderTable();
     try {
       const meta = sectionMeta[sectionName];
-      if (sectionName === 'telemetry') {
+      if (sectionName === 'summary') {
+        const summary = await callRpc(meta.getRpc);
+        state.summary = summary || null;
+      } else if (sectionName === 'telemetry') {
         const [settings, rows] = await Promise.all([
           callRpc(meta.getRpc),
           callRpc(meta.listRpc),
@@ -706,11 +817,6 @@
       } else if (sectionName === 'rides') {
         const rows = await callRpc(meta.listRpc, buildRideFilterPayload());
         state.rides = Array.isArray(rows) ? rows : [];
-        state.selectedRideIds = new Set(
-          Array.from(state.selectedRideIds).filter((id) =>
-            state.rides.some((row) => row.id === id),
-          ),
-        );
       } else {
         const rows = await callRpc(meta.listRpc);
         state[sectionName] = Array.isArray(rows) ? rows : [];
@@ -756,36 +862,46 @@
     }
   }
 
-  async function deleteSelectedRides() {
-    const rideIds = Array.from(state.selectedRideIds);
-    if (!rideIds.length) return;
+  async function deleteSelectedRows() {
+    const meta = sectionMeta[state.activeSection];
+    const rowIds = Array.from(state.selectedRowIds);
+    if (!meta.deleteRpc || !rowIds.length) return;
 
-    const confirmed = window.confirm(
-      rideIds.length === 1
-        ? 'Confermi la cancellazione dell\'uscita selezionata?'
-        : `Confermi la cancellazione di ${rideIds.length} uscite selezionate?`,
-    );
+    const confirmMessage =
+      rowIds.length === 1
+        ? meta.deleteConfirmSingular || 'Confermi la cancellazione della riga selezionata?'
+        : typeof meta.deleteConfirmPlural === 'function'
+          ? meta.deleteConfirmPlural(rowIds.length)
+          : `Confermi la cancellazione di ${rowIds.length} righe selezionate?`;
+    const confirmed = window.confirm(confirmMessage);
     if (!confirmed) return;
 
     deleteSelectedButton.disabled = true;
-    deleteSelectedButton.textContent = 'Eliminazione...';
+    deleteSelectedButton.textContent = meta.deleteProgressLabel || 'Eliminazione...';
 
     try {
-      const result = await callRpc(sectionMeta.rides.deleteRpc, {
-        p_ride_ids: rideIds,
+      const deleteParam = meta.deleteParam || 'p_ids';
+      const result = await callRpc(meta.deleteRpc, {
+        [deleteParam]: rowIds,
       });
       const deleted = Number(result && result.deleted ? result.deleted : 0);
-      state.selectedRideIds.clear();
+      state.selectedRowIds.clear();
+      const successMessage =
+        deleted === 1
+          ? meta.deleteSuccessSingular || '1 riga eliminata.'
+          : typeof meta.deleteSuccessPlural === 'function'
+            ? meta.deleteSuccessPlural(deleted)
+            : `${deleted} righe eliminate.`;
       showFlash(
-        deleted === 1 ? '1 uscita eliminata.' : `${deleted} uscite eliminate.`,
+        successMessage,
         'success',
       );
-      await loadSection('rides');
+      await loadSection(state.activeSection);
     } catch (error) {
       showFlash(normalizeError(error), 'error');
     } finally {
-      deleteSelectedButton.textContent = 'Elimina selezionate';
-      deleteSelectedButton.disabled = state.selectedRideIds.size === 0;
+      deleteSelectedButton.textContent = meta.deleteButtonLabel || 'Elimina selezionate';
+      deleteSelectedButton.disabled = state.selectedRowIds.size === 0;
     }
   }
 
@@ -970,25 +1086,26 @@
     });
     rideStatusFilter.addEventListener('change', (event) => {
       state.rideFilters.status = event.target.value;
-      state.selectedRideIds.clear();
+      state.selectedRowIds.clear();
       loadSection('rides');
     });
     rideExpiredFilter.addEventListener('change', (event) => {
       state.rideFilters.expired = event.target.value;
-      state.selectedRideIds.clear();
+      state.selectedRowIds.clear();
       loadSection('rides');
     });
     selectAllRowsCheckbox.addEventListener('change', () => {
-      if (state.activeSection !== 'rides') return;
-      const visibleIds = getFilteredRows().map((row) => row.id).filter(Boolean);
+      const meta = sectionMeta[state.activeSection];
+      if (meta.rowSelectable !== true) return;
+      const visibleIds = getFilteredRows().map((row) => getRowId(row)).filter((id) => id != null);
       if (selectAllRowsCheckbox.checked) {
-        visibleIds.forEach((id) => state.selectedRideIds.add(id));
+        visibleIds.forEach((id) => state.selectedRowIds.add(id));
       } else {
-        visibleIds.forEach((id) => state.selectedRideIds.delete(id));
+        visibleIds.forEach((id) => state.selectedRowIds.delete(id));
       }
       renderTable();
     });
-    deleteSelectedButton.addEventListener('click', deleteSelectedRides);
+    deleteSelectedButton.addEventListener('click', deleteSelectedRows);
     menu.addEventListener('click', (event) => {
       const button = event.target.closest('.menu-button');
       if (!button) return;
