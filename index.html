@@ -15,10 +15,10 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>Passengers Admin</title>
-    <link rel="stylesheet" href="./styles.css?v=20260422a" />
+    <link rel="stylesheet" href="./styles.css?v=20260422b" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=20260422a"></script>
-    <script defer src="./app.js?v=20260422a"></script>
+    <script defer src="./app.js?v=20260422b"></script>
   </head>
   <body>
     <div class="admin-shell">
@@ -47,6 +47,9 @@
           </button>
           <button class="menu-button" data-section="illeciti" type="button">
             Illeciti
+          </button>
+          <button class="menu-button" data-section="blockedWords" type="button">
+            Parole non ammesse
           </button>
           <button class="menu-button" data-section="blockedUsers" type="button">
             Utenti Bloccati
@@ -174,8 +177,6 @@
                 </button>
               </div>
             </div>
-
-            <div id="tableState" class="table-state hidden"></div>
 
             <div id="telemetryPanel" class="telemetry-panel hidden">
               <div class="telemetry-panel-grid">
@@ -311,6 +312,33 @@
             <div id="summaryPanel" class="summary-panel hidden">
               <div id="summaryGrid" class="summary-grid"></div>
             </div>
+
+            <div id="blockedWordsPanel" class="blocked-words-panel hidden">
+              <div class="blocked-words-header">
+                <p class="eyebrow">Nuova parola</p>
+                <p class="blocked-words-copy">
+                  Inserisci una parola o espressione che deve essere bloccata nei controlli contenuti dell'app.
+                </p>
+              </div>
+
+              <form id="blockedWordsForm" class="blocked-words-form">
+                <label class="field">
+                  <span>Parola o espressione da bloccare</span>
+                  <input
+                    id="blockedWordInput"
+                    type="text"
+                    maxlength="120"
+                    placeholder="es. insulto oppure frase non ammessa"
+                  />
+                </label>
+
+                <button id="blockedWordAddButton" class="primary-button" type="submit">
+                  Aggiungi parola
+                </button>
+              </form>
+            </div>
+
+            <div id="tableState" class="table-state hidden"></div>
 
             <div class="table-wrap">
               <table>

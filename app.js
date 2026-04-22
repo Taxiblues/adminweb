@@ -49,6 +49,10 @@
   const iosLatestVersionInput = document.getElementById('iosLatestVersionInput');
   const iosStoreUrlInput = document.getElementById('iosStoreUrlInput');
   const appUpdateSaveButton = document.getElementById('appUpdateSaveButton');
+  const blockedWordsPanel = document.getElementById('blockedWordsPanel');
+  const blockedWordsForm = document.getElementById('blockedWordsForm');
+  const blockedWordInput = document.getElementById('blockedWordInput');
+  const blockedWordAddButton = document.getElementById('blockedWordAddButton');
 
   const state = {
     supabase: null,
@@ -61,6 +65,7 @@
     rides: [],
     illeciti: [],
     blockedUsers: [],
+    blockedWords: [],
     summary: null,
     telemetry: null,
     telemetryLogs: [],
@@ -298,6 +303,30 @@
         row.note,
       ],
     },
+    blockedWords: {
+      title: 'Parole non ammesse',
+      description:
+        'Gestisci l\'elenco delle parole o espressioni bloccate nei controlli contenuti lato backend.',
+      listRpc: 'admin_list_blocked_words',
+      addRpc: 'admin_add_blocked_word',
+      deleteRpc: 'admin_delete_blocked_words',
+      deleteParam: 'p_ids',
+      rowSelectable: true,
+      deleteConfirmSingular: 'Confermi la cancellazione della parola selezionata?',
+      deleteConfirmPlural: (count) =>
+        `Confermi la cancellazione di ${count} parole selezionate?`,
+      deleteButtonLabel: 'Elimina selezionate',
+      deleteProgressLabel: 'Eliminazione...',
+      deleteSuccessSingular: '1 parola eliminata.',
+      deleteSuccessPlural: (count) => `${count} parole eliminate.`,
+      searchPlaceholder: 'Filtra per parola o data di creazione',
+      columns: [
+        { label: 'Id', value: (row) => row.id || '-' },
+        { label: 'Parola', value: (row) => row.parola || '-' },
+        { label: 'Creata il', value: (row) => formatDateTime(row.created_at) },
+      ],
+      searchText: (row) => [row.id, row.parola, row.created_at],
+    },
     blockedUsers: {
       title: 'Utenti Bloccati',
       description:
@@ -521,6 +550,7 @@
     const isSummarySection = state.activeSection === 'summary';
     const isTelemetrySection = state.activeSection === 'telemetry';
     const isAppUpdatesSection = state.activeSection === 'appUpdates';
+    const isBlockedWordsSection = state.activeSection === 'blockedWords';
     const rows = getFilteredRows();
 
     sectionTitle.textContent = meta.title;
@@ -533,6 +563,7 @@
     summaryPanel.classList.toggle('hidden', !isSummarySection);
     telemetryPanel.classList.toggle('hidden', !isTelemetrySection);
     appUpdatePanel.classList.toggle('hidden', !isAppUpdatesSection);
+    blockedWordsPanel.classList.toggle('hidden', !isBlockedWordsSection);
     tableHead.parentElement.parentElement.classList.toggle(
       'hidden',
       meta.hideTable === true,
@@ -965,6 +996,37 @@
     }
   }
 
+  async function addBlockedWord(event) {
+    event.preventDefault();
+    const meta = sectionMeta.blockedWords;
+    const word = blockedWordInput.value.trim();
+
+    if (!word) {
+      showFlash('Inserisci una parola da bloccare.', 'error');
+      blockedWordInput.focus();
+      return;
+    }
+
+    blockedWordAddButton.disabled = true;
+    blockedWordAddButton.textContent = 'Salvataggio...';
+
+    try {
+      await callRpc(meta.addRpc, {
+        p_parola: word,
+      });
+      blockedWordInput.value = '';
+      showFlash('Parola bloccata aggiunta.', 'success');
+      await loadSection('blockedWords');
+      blockedWordInput.focus();
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+      blockedWordInput.focus();
+    } finally {
+      blockedWordAddButton.disabled = false;
+      blockedWordAddButton.textContent = 'Aggiungi parola';
+    }
+  }
+
   async function handleLogin(event) {
     event.preventDefault();
     if (!state.supabase) {
@@ -1115,6 +1177,7 @@
     });
     telemetrySaveButton.addEventListener('click', saveTelemetrySettings);
     appUpdateSaveButton.addEventListener('click', saveAppUpdateSettings);
+    blockedWordsForm.addEventListener('submit', addBlockedWord);
   }
 
   function renderEnvironmentBadge() {
