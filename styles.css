@@ -100,6 +100,11 @@ textarea {
   color: var(--muted);
 }
 
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.95em;
+}
+
 .environment-badge {
   display: inline-flex;
   align-items: center;
@@ -354,6 +359,7 @@ textarea {
 
 .telemetry-panel,
 .app-update-panel,
+.communications-panel,
 .blocked-words-panel,
 .summary-panel {
   display: grid;
@@ -432,6 +438,35 @@ textarea {
   grid-template-columns: minmax(280px, 1fr) auto;
   gap: 16px;
   align-items: end;
+}
+
+.communications-header {
+  display: grid;
+  gap: 20px;
+}
+
+.communications-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.communications-form-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.communications-body-field {
+  min-width: 0;
+}
+
+.communications-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
 }
 
 .app-update-platform-fields {
@@ -639,7 +674,8 @@ th {
 
   .hero,
   .toolbar,
-  .bulk-actions {
+  .bulk-actions,
+  .communications-footer {
     flex-direction: column;
     align-items: stretch;
   }
@@ -647,6 +683,8 @@ th {
   .ride-filters,
   .telemetry-panel-grid,
   .telemetry-meta,
+  .communications-meta-grid,
+  .communications-form-grid,
   .app-update-grid,
   .app-update-message-grid,
   .app-update-platform-fields,

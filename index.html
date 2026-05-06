@@ -15,10 +15,10 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>Passengers Admin</title>
-    <link rel="stylesheet" href="./styles.css?v=20260422b" />
+    <link rel="stylesheet" href="./styles.css?v=20260504a" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=20260422a"></script>
-    <script defer src="./app.js?v=20260422b"></script>
+    <script defer src="./app.js?v=20260504a"></script>
   </head>
   <body>
     <div class="admin-shell">
@@ -59,6 +59,9 @@
           </button>
           <button class="menu-button" data-section="appUpdates" type="button">
             Aggiornamenti App
+          </button>
+          <button class="menu-button" data-section="communications" type="button">
+            Comunicazioni
           </button>
         </nav>
 
@@ -336,6 +339,70 @@
                   Aggiungi parola
                 </button>
               </form>
+            </div>
+
+            <div id="communicationsPanel" class="communications-panel hidden">
+              <div class="communications-header">
+                <div class="blocked-words-header">
+                  <p class="eyebrow">Broadcast Push</p>
+                  <p class="blocked-words-copy">
+                    Invia una notifica breve ai device attivi registrati in <code>device_tokens</code>
+                    senza toccare il flusso push automatico usato dall'app.
+                  </p>
+                </div>
+
+                <div class="communications-meta-grid">
+                  <div class="telemetry-meta-card">
+                    <span class="telemetry-meta-label">Device attivi</span>
+                    <strong id="communicationActiveDevicesCount">0</strong>
+                  </div>
+                  <div class="telemetry-meta-card">
+                    <span class="telemetry-meta-label">Utenti raggiungibili</span>
+                    <strong id="communicationActiveUsersCount">0</strong>
+                  </div>
+                  <div class="telemetry-meta-card">
+                    <span class="telemetry-meta-label">Broadcast in coda</span>
+                    <strong id="communicationQueuedCount">0</strong>
+                  </div>
+                  <div class="telemetry-meta-card">
+                    <span class="telemetry-meta-label">Ultimo invio</span>
+                    <strong id="communicationLastBroadcastAt">-</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div class="communications-form-grid">
+                <label class="field">
+                  <span>Titolo notifica</span>
+                  <input
+                    id="communicationTitleInput"
+                    type="text"
+                    maxlength="120"
+                    placeholder="es. Aggiornamento Passengers"
+                  />
+                </label>
+
+                <label class="field communications-body-field">
+                  <span>Testo notifica</span>
+                  <textarea
+                    id="communicationBodyInput"
+                    rows="4"
+                    maxlength="240"
+                    placeholder="Scrivi un testo breve e chiaro da inviare via push a tutti i device attivi"
+                  ></textarea>
+                </label>
+              </div>
+
+              <div class="communications-footer">
+                <p class="blocked-words-copy">
+                  Invio ai device con token aggiornato negli ultimi
+                  <strong id="communicationActiveWindowLabel">30</strong> giorni.
+                </p>
+
+                <button id="communicationSendButton" class="primary-button" type="button">
+                  Invia notifica broadcast
+                </button>
+              </div>
             </div>
 
             <div id="tableState" class="table-state hidden"></div>

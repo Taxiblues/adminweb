@@ -53,6 +53,31 @@
   const blockedWordsForm = document.getElementById('blockedWordsForm');
   const blockedWordInput = document.getElementById('blockedWordInput');
   const blockedWordAddButton = document.getElementById('blockedWordAddButton');
+  const communicationsPanel = document.getElementById('communicationsPanel');
+  const communicationActiveDevicesCount = document.getElementById(
+    'communicationActiveDevicesCount',
+  );
+  const communicationActiveUsersCount = document.getElementById(
+    'communicationActiveUsersCount',
+  );
+  const communicationQueuedCount = document.getElementById(
+    'communicationQueuedCount',
+  );
+  const communicationLastBroadcastAt = document.getElementById(
+    'communicationLastBroadcastAt',
+  );
+  const communicationActiveWindowLabel = document.getElementById(
+    'communicationActiveWindowLabel',
+  );
+  const communicationTitleInput = document.getElementById(
+    'communicationTitleInput',
+  );
+  const communicationBodyInput = document.getElementById(
+    'communicationBodyInput',
+  );
+  const communicationSendButton = document.getElementById(
+    'communicationSendButton',
+  );
 
   const state = {
     supabase: null,
@@ -66,10 +91,17 @@
     illeciti: [],
     blockedUsers: [],
     blockedWords: [],
+    communications: [],
     summary: null,
     telemetry: null,
     telemetryLogs: [],
     appUpdateSettings: null,
+    communicationSummary: null,
+    communicationDraft: {
+      title: 'Aggiornamento Passengers',
+      body: '',
+      activeWithinDays: 30,
+    },
     selectedRowIds: new Set(),
     rideFilters: {
       status: '',
@@ -438,6 +470,72 @@
       metricValue: () => 1,
       columns: [],
     },
+    communications: {
+      title: 'Comunicazioni',
+      description:
+        'Invia notifiche push broadcast ai device attivi registrati, separando questo flusso dalle notifiche automatiche dell\'app.',
+      getRpc: 'admin_get_push_broadcast_summary',
+      listRpc: 'admin_list_push_broadcasts',
+      createRpc: 'admin_queue_push_broadcast',
+      dataKey: 'communications',
+      metricValue: () => state.communicationSummary?.active_device_tokens ?? 0,
+      searchPlaceholder:
+        'Filtra per titolo, testo, stato, admin creatore o eventuale errore',
+      rowAction: (row) => {
+        const status = String(row.status || '').trim().toLowerCase();
+        if (status !== 'queued' && status !== 'failed') {
+          return null;
+        }
+        return {
+          label: status === 'queued' ? 'Invia ora' : 'Riprova',
+          className: 'primary-button',
+          onClick: () => triggerCommunicationBroadcast(row.id),
+        };
+      },
+      columns: [
+        { label: 'Titolo', value: (row) => row.title || '-' },
+        { label: 'Testo', value: (row) => row.body || '-' },
+        {
+          label: 'Stato',
+          render: (row) =>
+            `<span class="pill ${broadcastStatusClass(row.status)}">${escapeHtml(
+              formatBroadcastStatus(row.status),
+            )}</span>`,
+        },
+        {
+          label: 'Target',
+          value: (row) => formatBroadcastTarget(row),
+        },
+        {
+          label: 'Invii',
+          value: (row) => `${row.sent_count || 0}/${row.requested_recipient_count || 0}`,
+        },
+        {
+          label: 'Admin',
+          value: (row) => row.requested_by_username || '-',
+        },
+        {
+          label: 'Creato il',
+          value: (row) => formatDateTime(row.created_at),
+        },
+        {
+          label: 'Completato il',
+          value: (row) => formatDateTime(row.completed_at),
+        },
+        {
+          label: 'Ultimo errore',
+          value: (row) => row.last_error || '-',
+        },
+        { label: 'Azione', className: 'actions-col', action: true },
+      ],
+      searchText: (row) => [
+        row.title,
+        row.body,
+        row.status,
+        row.requested_by_username,
+        row.last_error,
+      ],
+    },
   };
 
   function showFlash(message, variant) {
@@ -551,6 +649,7 @@
     const isTelemetrySection = state.activeSection === 'telemetry';
     const isAppUpdatesSection = state.activeSection === 'appUpdates';
     const isBlockedWordsSection = state.activeSection === 'blockedWords';
+    const isCommunicationsSection = state.activeSection === 'communications';
     const rows = getFilteredRows();
 
     sectionTitle.textContent = meta.title;
@@ -564,6 +663,7 @@
     telemetryPanel.classList.toggle('hidden', !isTelemetrySection);
     appUpdatePanel.classList.toggle('hidden', !isAppUpdatesSection);
     blockedWordsPanel.classList.toggle('hidden', !isBlockedWordsSection);
+    communicationsPanel.classList.toggle('hidden', !isCommunicationsSection);
     tableHead.parentElement.parentElement.classList.toggle(
       'hidden',
       meta.hideTable === true,
@@ -573,6 +673,7 @@
     if (isSummarySection) renderSummaryPanel();
     if (isTelemetrySection) renderTelemetryPanel();
     if (isAppUpdatesSection) renderAppUpdatePanel();
+    if (isCommunicationsSection) renderCommunicationsPanel();
 
     if (meta.hideTable === true) {
       tableHead.innerHTML = '';
@@ -775,6 +876,28 @@
     iosStoreUrlInput.value = settings.ios_store_url || '';
   }
 
+  function renderCommunicationsPanel() {
+    const summary = state.communicationSummary || {};
+    const windowDays = Number(
+      summary.active_within_days || state.communicationDraft.activeWithinDays || 30,
+    );
+    communicationActiveDevicesCount.textContent = String(
+      summary.active_device_tokens ?? 0,
+    );
+    communicationActiveUsersCount.textContent = String(summary.active_users ?? 0);
+    communicationQueuedCount.textContent = String(summary.queued_broadcasts ?? 0);
+    communicationActiveWindowLabel.textContent = String(windowDays);
+
+    const lastReference = summary.last_completed_at || summary.last_broadcast_at;
+    const lastStatus = formatBroadcastStatus(summary.last_broadcast_status);
+    communicationLastBroadcastAt.textContent = lastReference
+      ? `${formatDateTime(lastReference)} · ${lastStatus}`
+      : '-';
+
+    communicationTitleInput.value = state.communicationDraft.title;
+    communicationBodyInput.value = state.communicationDraft.body;
+  }
+
   function parseOptionalIntegerInput(value) {
     const normalized = String(value || '').trim();
     if (!normalized) return null;
@@ -784,6 +907,14 @@
 
   async function callRpc(name, params) {
     const { data, error } = await state.supabase.rpc(name, params || {});
+    if (error) throw error;
+    return data;
+  }
+
+  async function invokeEdgeFunction(name, body) {
+    const { data, error } = await state.supabase.functions.invoke(name, {
+      body,
+    });
     if (error) throw error;
     return data;
   }
@@ -835,6 +966,15 @@
       if (sectionName === 'summary') {
         const summary = await callRpc(meta.getRpc);
         state.summary = summary || null;
+      } else if (sectionName === 'communications') {
+        const [summary, rows] = await Promise.all([
+          callRpc(meta.getRpc, {
+            p_active_within_days: state.communicationDraft.activeWithinDays,
+          }),
+          callRpc(meta.listRpc),
+        ]);
+        state.communicationSummary = summary || null;
+        state.communications = Array.isArray(rows) ? rows : [];
       } else if (sectionName === 'telemetry') {
         const [settings, rows] = await Promise.all([
           callRpc(meta.getRpc),
@@ -993,6 +1133,142 @@
     } finally {
       appUpdateSaveButton.disabled = false;
       appUpdateSaveButton.textContent = 'Salva configurazione update';
+    }
+  }
+
+  function formatBroadcastStatus(value) {
+    const status = String(value || '').trim().toLowerCase();
+    switch (status) {
+      case 'queued':
+        return 'In coda';
+      case 'processing':
+        return 'Invio';
+      case 'partial':
+        return 'Parziale';
+      case 'failed':
+        return 'Fallito';
+      case 'sent':
+        return 'Inviato';
+      default:
+        return status || '-';
+    }
+  }
+
+  function broadcastStatusClass(value) {
+    const status = String(value || '').trim().toLowerCase();
+    if (status === 'sent') return 'is-active';
+    if (status === 'queued' || status === 'partial' || status === 'processing') {
+      return 'is-warning';
+    }
+    return 'is-blocked';
+  }
+
+  function formatBroadcastTarget(row) {
+    const platform = row.target_platform ? row.target_platform.toUpperCase() : 'Tutti';
+    const days = Number(row.active_within_days || 30);
+    return `${platform} · ${days}g`;
+  }
+
+  function describeBroadcastResult(result) {
+    const status = String(result?.status || '').trim().toLowerCase();
+    const requested = Number(result?.requestedRecipientCount || 0);
+    const sent = Number(result?.sentCount || 0);
+    const failed = Number(result?.failedCount || 0);
+
+    if (result?.alreadyProcessed) {
+      return {
+        variant: status === 'failed' ? 'error' : 'success',
+        message: `Campagna già processata. Stato attuale: ${formatBroadcastStatus(status)}.`,
+      };
+    }
+
+    if (status === 'failed') {
+      return {
+        variant: 'error',
+        message: `Broadcast fallito: 0/${requested} device raggiunti.`,
+      };
+    }
+
+    if (status === 'partial') {
+      return {
+        variant: 'success',
+        message: `Broadcast completato parzialmente: ${sent} inviati, ${failed} falliti.`,
+      };
+    }
+
+    return {
+      variant: 'success',
+      message: `Broadcast inviato a ${sent} device attivi.`,
+    };
+  }
+
+  async function triggerCommunicationBroadcast(broadcastId) {
+    try {
+      const result = await invokeEdgeFunction('admin-broadcast-push', {
+        broadcastId,
+      });
+      const feedback = describeBroadcastResult(result || {});
+      showFlash(feedback.message, feedback.variant);
+      await loadSection('communications');
+      return result;
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+      await loadSection('communications');
+      throw error;
+    }
+  }
+
+  async function sendCommunicationBroadcast() {
+    const meta = sectionMeta.communications;
+    const title = state.communicationDraft.title.trim();
+    const body = state.communicationDraft.body.trim();
+
+    if (title.length < 3) {
+      showFlash('Inserisci un titolo di almeno 3 caratteri.', 'error');
+      communicationTitleInput.focus();
+      return;
+    }
+
+    if (body.length < 3) {
+      showFlash('Inserisci un testo di almeno 3 caratteri.', 'error');
+      communicationBodyInput.focus();
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Confermi l'invio della notifica push a tutti i device attivi degli ultimi ${state.communicationDraft.activeWithinDays} giorni?`,
+    );
+    if (!confirmed) return;
+
+    communicationSendButton.disabled = true;
+    communicationSendButton.textContent = 'Invio in corso...';
+
+    let queuedBroadcast = null;
+
+    try {
+      queuedBroadcast = await callRpc(meta.createRpc, {
+        p_title: title,
+        p_body: body,
+        p_active_within_days: state.communicationDraft.activeWithinDays,
+      });
+
+      const result = await invokeEdgeFunction('admin-broadcast-push', {
+        broadcastId: queuedBroadcast?.id,
+      });
+      const feedback = describeBroadcastResult(result || {});
+      state.communicationDraft.body = '';
+      renderCommunicationsPanel();
+      showFlash(feedback.message, feedback.variant);
+      await loadSection('communications');
+    } catch (error) {
+      const queuedSuffix = queuedBroadcast?.id
+        ? ` Campagna #${queuedBroadcast.id} salvata in coda.`
+        : '';
+      showFlash(`${normalizeError(error)}${queuedSuffix}`, 'error');
+      await loadSection('communications');
+    } finally {
+      communicationSendButton.disabled = false;
+      communicationSendButton.textContent = 'Invia notifica broadcast';
     }
   }
 
@@ -1178,6 +1454,13 @@
     telemetrySaveButton.addEventListener('click', saveTelemetrySettings);
     appUpdateSaveButton.addEventListener('click', saveAppUpdateSettings);
     blockedWordsForm.addEventListener('submit', addBlockedWord);
+    communicationTitleInput.addEventListener('input', (event) => {
+      state.communicationDraft.title = event.target.value;
+    });
+    communicationBodyInput.addEventListener('input', (event) => {
+      state.communicationDraft.body = event.target.value;
+    });
+    communicationSendButton.addEventListener('click', sendCommunicationBroadcast);
   }
 
   function renderEnvironmentBadge() {
