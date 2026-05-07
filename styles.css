@@ -359,6 +359,7 @@ code {
 
 .telemetry-panel,
 .app-update-panel,
+.events-panel,
 .communications-panel,
 .blocked-words-panel,
 .summary-panel {
@@ -438,6 +439,45 @@ code {
   grid-template-columns: minmax(280px, 1fr) auto;
   gap: 16px;
   align-items: end;
+}
+
+.events-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+
+.events-description-field,
+.events-url-field {
+  grid-column: span 2;
+}
+
+.events-poster-field,
+.event-poster-preview-wrap,
+.events-actions {
+  grid-column: span 2;
+}
+
+.event-poster-preview-wrap {
+  min-height: 120px;
+  border: 1px dashed var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.event-poster-preview {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+}
+
+.events-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .communications-header {
@@ -685,12 +725,21 @@ th {
   .telemetry-meta,
   .communications-meta-grid,
   .communications-form-grid,
+  .events-form,
   .app-update-grid,
   .app-update-message-grid,
   .app-update-platform-fields,
   .blocked-words-form,
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .events-description-field,
+  .events-url-field,
+  .events-poster-field,
+  .event-poster-preview-wrap,
+  .events-actions {
+    grid-column: 1;
   }
 
   .telemetry-actions {

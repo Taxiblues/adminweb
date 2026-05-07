@@ -15,10 +15,10 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>Passengers Admin</title>
-    <link rel="stylesheet" href="./styles.css?v=20260504a" />
+    <link rel="stylesheet" href="./styles.css?v=20260507a" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=20260422a"></script>
-    <script defer src="./app.js?v=20260504a"></script>
+    <script defer src="./app.js?v=20260507a"></script>
   </head>
   <body>
     <div class="admin-shell">
@@ -44,6 +44,9 @@
           </button>
           <button class="menu-button" data-section="rides" type="button">
             Uscite
+          </button>
+          <button class="menu-button" data-section="events" type="button">
+            Eventi
           </button>
           <button class="menu-button" data-section="illeciti" type="button">
             Illeciti
@@ -314,6 +317,86 @@
 
             <div id="summaryPanel" class="summary-panel hidden">
               <div id="summaryGrid" class="summary-grid"></div>
+            </div>
+
+            <div id="eventsPanel" class="events-panel hidden">
+              <div class="blocked-words-header">
+                <p class="eyebrow">Evento app</p>
+                <p class="blocked-words-copy">
+                  Pubblica una locandina nella sezione Eventi dell'app. Gli eventi vengono
+                  mostrati fino alla data di scadenza indicata.
+                </p>
+              </div>
+
+              <form id="eventsForm" class="events-form">
+                <input id="eventIdInput" type="hidden" />
+                <input id="eventPosterPathInput" type="hidden" />
+
+                <label class="field">
+                  <span>Titolo evento</span>
+                  <input
+                    id="eventTitleInput"
+                    type="text"
+                    maxlength="140"
+                    placeholder="es. Motoraduno di primavera"
+                  />
+                </label>
+
+                <label class="field">
+                  <span>Data evento</span>
+                  <input id="eventDateInput" type="datetime-local" />
+                </label>
+
+                <label class="field">
+                  <span>Scadenza visibilita</span>
+                  <input id="eventExpiresInput" type="datetime-local" />
+                </label>
+
+                <label class="field">
+                  <span>Stato</span>
+                  <select id="eventStatusInput" class="field-select">
+                    <option value="active">Attivo</option>
+                    <option value="hidden">Nascosto</option>
+                  </select>
+                </label>
+
+                <label class="field events-description-field">
+                  <span>Descrizione breve</span>
+                  <textarea
+                    id="eventDescriptionInput"
+                    rows="3"
+                    maxlength="500"
+                    placeholder="Testo opzionale mostrato sulla card"
+                  ></textarea>
+                </label>
+
+                <label class="field events-url-field">
+                  <span>Link dettagli opzionale</span>
+                  <input
+                    id="eventUrlInput"
+                    type="url"
+                    placeholder="https://..."
+                  />
+                </label>
+
+                <label class="field events-poster-field">
+                  <span>Locandina</span>
+                  <input id="eventPosterInput" type="file" accept="image/*" />
+                </label>
+
+                <div class="event-poster-preview-wrap">
+                  <img id="eventPosterPreview" class="event-poster-preview hidden" alt="Anteprima locandina" />
+                </div>
+
+                <div class="events-actions">
+                  <button id="eventResetButton" class="ghost-button" type="button">
+                    Nuovo evento
+                  </button>
+                  <button id="eventSaveButton" class="primary-button" type="submit">
+                    Salva evento
+                  </button>
+                </div>
+              </form>
             </div>
 
             <div id="blockedWordsPanel" class="blocked-words-panel hidden">

@@ -53,6 +53,20 @@
   const blockedWordsForm = document.getElementById('blockedWordsForm');
   const blockedWordInput = document.getElementById('blockedWordInput');
   const blockedWordAddButton = document.getElementById('blockedWordAddButton');
+  const eventsPanel = document.getElementById('eventsPanel');
+  const eventsForm = document.getElementById('eventsForm');
+  const eventIdInput = document.getElementById('eventIdInput');
+  const eventPosterPathInput = document.getElementById('eventPosterPathInput');
+  const eventTitleInput = document.getElementById('eventTitleInput');
+  const eventDateInput = document.getElementById('eventDateInput');
+  const eventExpiresInput = document.getElementById('eventExpiresInput');
+  const eventStatusInput = document.getElementById('eventStatusInput');
+  const eventDescriptionInput = document.getElementById('eventDescriptionInput');
+  const eventUrlInput = document.getElementById('eventUrlInput');
+  const eventPosterInput = document.getElementById('eventPosterInput');
+  const eventPosterPreview = document.getElementById('eventPosterPreview');
+  const eventResetButton = document.getElementById('eventResetButton');
+  const eventSaveButton = document.getElementById('eventSaveButton');
   const communicationsPanel = document.getElementById('communicationsPanel');
   const communicationActiveDevicesCount = document.getElementById(
     'communicationActiveDevicesCount',
@@ -88,6 +102,7 @@
     riders: [],
     passengers: [],
     rides: [],
+    events: [],
     illeciti: [],
     blockedUsers: [],
     blockedWords: [],
@@ -101,6 +116,18 @@
       title: 'Aggiornamento Passengers',
       body: '',
       activeWithinDays: 30,
+    },
+    eventDraft: {
+      id: '',
+      title: '',
+      description: '',
+      eventDate: '',
+      expiresAt: '',
+      status: 'active',
+      externalUrl: '',
+      posterImagePath: '',
+      posterPreviewUrl: '',
+      posterFile: null,
     },
     selectedRowIds: new Set(),
     rideFilters: {
@@ -298,6 +325,53 @@
         row.rider_nickname,
         row.passenger_nickname,
         row.start_location,
+      ],
+    },
+    events: {
+      title: 'Eventi',
+      description:
+        'Gestisci gli eventi pubblicati nell’app con locandina, data evento e scadenza di visibilita.',
+      listRpc: 'admin_list_app_events',
+      createRpc: 'admin_create_app_event',
+      updateRpc: 'admin_update_app_event',
+      deleteRpc: 'admin_delete_app_events',
+      deleteFunction: 'admin-delete-app-events',
+      deleteParam: 'p_ids',
+      rowSelectable: true,
+      deleteConfirmSingular: 'Confermi la cancellazione dell\'evento selezionato?',
+      deleteConfirmPlural: (count) =>
+        `Confermi la cancellazione di ${count} eventi selezionati?`,
+      deleteButtonLabel: 'Elimina selezionati',
+      deleteProgressLabel: 'Eliminazione...',
+      deleteSuccessSingular: '1 evento eliminato.',
+      deleteSuccessPlural: (count) => `${count} eventi eliminati.`,
+      searchPlaceholder: 'Filtra per titolo, descrizione, stato o link',
+      rowAction: (row) => ({
+        label: 'Modifica',
+        className: 'ghost-button',
+        onClick: () => editEvent(row),
+      }),
+      columns: [
+        { label: 'Titolo', value: (row) => row.title || '-' },
+        {
+          label: 'Stato',
+          render: (row) =>
+            `<span class="pill ${eventStatusClass(row.status)}">${escapeHtml(
+              formatEventStatus(row.status),
+            )}</span>`,
+        },
+        { label: 'Data evento', value: (row) => formatDateTime(row.event_date) },
+        { label: 'Scadenza', value: (row) => formatDateTime(row.expires_at) },
+        { label: 'Locandina', value: (row) => row.poster_image_path || '-' },
+        { label: 'Link', value: (row) => row.external_url || '-' },
+        { label: 'Azione', className: 'actions-col', action: true },
+      ],
+      searchText: (row) => [
+        row.title,
+        row.description,
+        row.status,
+        row.poster_image_path,
+        row.external_url,
       ],
     },
     illeciti: {
@@ -650,6 +724,7 @@
     const isAppUpdatesSection = state.activeSection === 'appUpdates';
     const isBlockedWordsSection = state.activeSection === 'blockedWords';
     const isCommunicationsSection = state.activeSection === 'communications';
+    const isEventsSection = state.activeSection === 'events';
     const rows = getFilteredRows();
 
     sectionTitle.textContent = meta.title;
@@ -662,6 +737,7 @@
     summaryPanel.classList.toggle('hidden', !isSummarySection);
     telemetryPanel.classList.toggle('hidden', !isTelemetrySection);
     appUpdatePanel.classList.toggle('hidden', !isAppUpdatesSection);
+    eventsPanel.classList.toggle('hidden', !isEventsSection);
     blockedWordsPanel.classList.toggle('hidden', !isBlockedWordsSection);
     communicationsPanel.classList.toggle('hidden', !isCommunicationsSection);
     tableHead.parentElement.parentElement.classList.toggle(
@@ -674,6 +750,7 @@
     if (isTelemetrySection) renderTelemetryPanel();
     if (isAppUpdatesSection) renderAppUpdatePanel();
     if (isCommunicationsSection) renderCommunicationsPanel();
+    if (isEventsSection) renderEventsPanel();
 
     if (meta.hideTable === true) {
       tableHead.innerHTML = '';
@@ -898,6 +975,201 @@
     communicationBodyInput.value = state.communicationDraft.body;
   }
 
+  function renderEventsPanel() {
+    eventIdInput.value = state.eventDraft.id;
+    eventTitleInput.value = state.eventDraft.title;
+    eventDescriptionInput.value = state.eventDraft.description;
+    eventDateInput.value = state.eventDraft.eventDate;
+    eventExpiresInput.value = state.eventDraft.expiresAt;
+    eventStatusInput.value = state.eventDraft.status || 'active';
+    eventUrlInput.value = state.eventDraft.externalUrl;
+    eventPosterPathInput.value = state.eventDraft.posterImagePath;
+
+    if (state.eventDraft.posterPreviewUrl) {
+      eventPosterPreview.src = state.eventDraft.posterPreviewUrl;
+      eventPosterPreview.classList.remove('hidden');
+    } else {
+      eventPosterPreview.removeAttribute('src');
+      eventPosterPreview.classList.add('hidden');
+    }
+
+    eventSaveButton.textContent = state.eventDraft.id ? 'Aggiorna evento' : 'Salva evento';
+  }
+
+  function toDateTimeLocalValue(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const pad = (number) => String(number).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+      date.getDate(),
+    )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  function toIsoFromLocalInput(value) {
+    const normalized = String(value || '').trim();
+    if (!normalized) return null;
+    const date = new Date(normalized);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toISOString();
+  }
+
+  function resetEventForm() {
+    const objectUrl = state.eventDraft.posterPreviewUrl || '';
+    if (objectUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(objectUrl);
+    }
+    state.eventDraft = {
+      id: '',
+      title: '',
+      description: '',
+      eventDate: '',
+      expiresAt: '',
+      status: 'active',
+      externalUrl: '',
+      posterImagePath: '',
+      posterPreviewUrl: '',
+      posterFile: null,
+    };
+    eventPosterInput.value = '';
+    renderEventsPanel();
+  }
+
+  function editEvent(row) {
+    const objectUrl = state.eventDraft.posterPreviewUrl || '';
+    if (objectUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(objectUrl);
+    }
+    state.eventDraft = {
+      id: String(row.id || ''),
+      title: row.title || '',
+      description: row.description || '',
+      eventDate: toDateTimeLocalValue(row.event_date),
+      expiresAt: toDateTimeLocalValue(row.expires_at),
+      status: ['active', 'hidden'].includes(String(row.status || '').toLowerCase())
+        ? String(row.status).toLowerCase()
+        : 'active',
+      externalUrl: row.external_url || '',
+      posterImagePath: row.poster_image_path || '',
+      posterPreviewUrl: '',
+      posterFile: null,
+    };
+    eventPosterInput.value = '';
+    renderEventsPanel();
+    eventsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  async function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || '');
+        resolve(result.includes(',') ? result.split(',').pop() : result);
+      };
+      reader.onerror = () => reject(reader.error || new Error('Lettura immagine non riuscita'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadEventPoster(file) {
+    if (!file) return null;
+    const result = await invokeEdgeFunction('admin-event-poster-upload', {
+      fileName: file.name,
+      contentType: file.type || 'image/jpeg',
+      base64: await fileToBase64(file),
+    });
+    const storagePath = String(result?.storagePath || '').trim();
+    if (!storagePath) {
+      throw new Error('Upload locandina non riuscito.');
+    }
+    return {
+      storagePath,
+      displayUrl: String(result?.displayUrl || '').trim(),
+    };
+  }
+
+  function updateEventDraftFromInputs() {
+    state.eventDraft.id = eventIdInput.value.trim();
+    state.eventDraft.title = eventTitleInput.value.trim();
+    state.eventDraft.description = eventDescriptionInput.value.trim();
+    state.eventDraft.eventDate = eventDateInput.value;
+    state.eventDraft.expiresAt = eventExpiresInput.value;
+    state.eventDraft.status = eventStatusInput.value || 'active';
+    state.eventDraft.externalUrl = eventUrlInput.value.trim();
+    state.eventDraft.posterImagePath = eventPosterPathInput.value.trim();
+  }
+
+  async function saveEvent(event) {
+    event.preventDefault();
+    const meta = sectionMeta.events;
+    updateEventDraftFromInputs();
+
+    if (state.eventDraft.title.length < 3) {
+      showFlash('Inserisci un titolo di almeno 3 caratteri.', 'error');
+      eventTitleInput.focus();
+      return;
+    }
+
+    const eventDate = toIsoFromLocalInput(state.eventDraft.eventDate);
+    const expiresAt = toIsoFromLocalInput(state.eventDraft.expiresAt);
+    if (!eventDate) {
+      showFlash('Inserisci una data evento valida.', 'error');
+      eventDateInput.focus();
+      return;
+    }
+    if (!expiresAt) {
+      showFlash('Inserisci una data di scadenza valida.', 'error');
+      eventExpiresInput.focus();
+      return;
+    }
+
+    eventSaveButton.disabled = true;
+    eventSaveButton.textContent = 'Salvataggio...';
+
+    try {
+      if (state.eventDraft.posterFile) {
+        const upload = await uploadEventPoster(state.eventDraft.posterFile);
+        state.eventDraft.posterImagePath = upload.storagePath;
+        state.eventDraft.posterPreviewUrl = upload.displayUrl || state.eventDraft.posterPreviewUrl;
+      }
+
+      if (!state.eventDraft.posterImagePath) {
+        showFlash('Carica una locandina per l\'evento.', 'error');
+        eventPosterInput.focus();
+        return;
+      }
+
+      const payload = {
+        p_title: state.eventDraft.title,
+        p_description: state.eventDraft.description || null,
+        p_event_date: eventDate,
+        p_expires_at: expiresAt,
+        p_poster_image_path: state.eventDraft.posterImagePath,
+        p_external_url: state.eventDraft.externalUrl || null,
+        p_status: state.eventDraft.status || 'active',
+      };
+
+      if (state.eventDraft.id) {
+        await callRpc(meta.updateRpc, {
+          p_id: Number(state.eventDraft.id),
+          ...payload,
+        });
+        showFlash('Evento aggiornato.', 'success');
+      } else {
+        await callRpc(meta.createRpc, payload);
+        showFlash('Evento creato.', 'success');
+      }
+
+      resetEventForm();
+      await loadSection('events');
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    } finally {
+      eventSaveButton.disabled = false;
+      renderEventsPanel();
+    }
+  }
+
   function parseOptionalIntegerInput(value) {
     const normalized = String(value || '').trim();
     if (!normalized) return null;
@@ -1052,10 +1324,18 @@
 
     try {
       const deleteParam = meta.deleteParam || 'p_ids';
-      const result = await callRpc(meta.deleteRpc, {
-        [deleteParam]: rowIds,
-      });
-      const deleted = Number(result && result.deleted ? result.deleted : 0);
+      const result = meta.deleteFunction
+        ? await invokeEdgeFunction(meta.deleteFunction, {
+            ids: rowIds,
+          })
+        : await callRpc(meta.deleteRpc, {
+            [deleteParam]: rowIds,
+          });
+      const deleted = Number(
+        result && (result.deleted || result.deletedRows)
+          ? result.deleted || result.deletedRows
+          : 0,
+      );
       state.selectedRowIds.clear();
       const successMessage =
         deleted === 1
@@ -1405,6 +1685,21 @@
     return 'is-blocked';
   }
 
+  function formatEventStatus(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'active') return 'Attivo';
+    if (normalized === 'hidden') return 'Nascosto';
+    if (normalized === 'deleted') return 'Eliminato';
+    return normalized || '-';
+  }
+
+  function eventStatusClass(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'active') return 'is-active';
+    if (normalized === 'hidden') return 'is-warning';
+    return 'is-blocked';
+  }
+
   function escapeHtml(value) {
     return String(value)
       .replace(/&/g, '&amp;')
@@ -1454,6 +1749,19 @@
     telemetrySaveButton.addEventListener('click', saveTelemetrySettings);
     appUpdateSaveButton.addEventListener('click', saveAppUpdateSettings);
     blockedWordsForm.addEventListener('submit', addBlockedWord);
+    eventsForm.addEventListener('submit', saveEvent);
+    eventResetButton.addEventListener('click', resetEventForm);
+    eventPosterInput.addEventListener('change', (event) => {
+      updateEventDraftFromInputs();
+      const file = event.target.files && event.target.files[0];
+      const objectUrl = state.eventDraft.posterPreviewUrl || '';
+      if (objectUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(objectUrl);
+      }
+      state.eventDraft.posterFile = file || null;
+      state.eventDraft.posterPreviewUrl = file ? URL.createObjectURL(file) : '';
+      renderEventsPanel();
+    });
     communicationTitleInput.addEventListener('input', (event) => {
       state.communicationDraft.title = event.target.value;
     });
