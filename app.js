@@ -104,6 +104,7 @@
     rides: [],
     events: [],
     illeciti: [],
+    safetyEvents: [],
     blockedUsers: [],
     blockedWords: [],
     communications: [],
@@ -215,7 +216,7 @@
     riders: {
       title: 'Bikers',
       description:
-        'Elenco completo dei bikers con possibilita di blocco e sblocco tramite RPC.',
+        'Elenco completo dei bikers con contatti sicurezza e possibilita di blocco tramite RPC.',
       listRpc: 'admin_list_riders',
       toggleRpc: 'admin_set_rider_blocked',
       toggleParam: 'p_uid',
@@ -231,6 +232,20 @@
       columns: [
         { label: 'Nickname', value: (row) => row.nickname || '-' },
         { label: 'Email', value: (row) => row.email || '-' },
+        { label: 'Telefono', value: (row) => row.phone_e164 || '-' },
+        {
+          label: 'Emergenza',
+          value: (row) => row.emergency_contact_phone_e164 || '-',
+        },
+        {
+          label: 'Sicurezza',
+          render: (row) => {
+            const verified = row.phone_verified_at || row.verification_level === 'phone_verified';
+            return `<span class="pill ${verified ? 'is-active' : 'is-warning'}">${
+              verified ? 'Verificato' : 'Telefono raccolto'
+            }</span>`;
+          },
+        },
         {
           label: 'Stato',
           render: (row) => {
@@ -242,12 +257,17 @@
         },
         { label: 'Azione', className: 'actions-col', action: true },
       ],
-      searchText: (row) => [row.nickname, row.email],
+      searchText: (row) => [
+        row.nickname,
+        row.email,
+        row.phone_e164,
+        row.emergency_contact_phone_e164,
+      ],
     },
     passengers: {
       title: 'Passengers',
       description:
-        'Elenco completo dei passengers con possibilita di blocco e sblocco tramite RPC.',
+        'Elenco completo dei passengers con contatti sicurezza e possibilita di blocco tramite RPC.',
       listRpc: 'admin_list_passengers',
       toggleRpc: 'admin_set_passenger_blocked',
       toggleParam: 'p_uid',
@@ -263,6 +283,20 @@
       columns: [
         { label: 'Nickname', value: (row) => row.nickname || '-' },
         { label: 'Email', value: (row) => row.email || '-' },
+        { label: 'Telefono', value: (row) => row.phone_e164 || '-' },
+        {
+          label: 'Emergenza',
+          value: (row) => row.emergency_contact_phone_e164 || '-',
+        },
+        {
+          label: 'Sicurezza',
+          render: (row) => {
+            const verified = row.phone_verified_at || row.verification_level === 'phone_verified';
+            return `<span class="pill ${verified ? 'is-active' : 'is-warning'}">${
+              verified ? 'Verificato' : 'Telefono raccolto'
+            }</span>`;
+          },
+        },
         {
           label: 'Stato',
           render: (row) => {
@@ -274,7 +308,12 @@
         },
         { label: 'Azione', className: 'actions-col', action: true },
       ],
-      searchText: (row) => [row.nickname, row.email],
+      searchText: (row) => [
+        row.nickname,
+        row.email,
+        row.phone_e164,
+        row.emergency_contact_phone_e164,
+      ],
     },
     rides: {
       title: 'Uscite',
@@ -407,6 +446,88 @@
         row.segnalato_email,
         row.segnalato_tipo,
         row.note,
+      ],
+    },
+    safetyEvents: {
+      title: 'Sicurezza giri',
+      description:
+        'Eventi sicurezza inviati da biker o passenger durante giri confermati.',
+      listRpc: 'admin_list_ride_safety_events',
+      deleteRpc: 'admin_delete_ride_safety_events',
+      deleteParam: 'p_ids',
+      rowSelectable: true,
+      deleteConfirmSingular:
+        'Confermi l\'eliminazione fisica dell\'evento sicurezza selezionato?',
+      deleteConfirmPlural: (count) =>
+        `Confermi l'eliminazione fisica di ${count} eventi sicurezza selezionati?`,
+      deleteButtonLabel: 'Elimina selezionati',
+      deleteProgressLabel: 'Eliminazione...',
+      deleteSuccessSingular: '1 evento sicurezza eliminato.',
+      deleteSuccessPlural: (count) => `${count} eventi sicurezza eliminati.`,
+      searchPlaceholder:
+        'Filtra per giro, nickname, telefono, tipo evento o messaggio',
+      rowAction: (row) => {
+        const status = String(row.status || '').toLowerCase();
+        if (status === 'closed') {
+          return {
+            label: 'Riapri',
+            className: 'ghost-button',
+            onClick: () => updateSafetyEventStatus(row.id, 'open'),
+          };
+        }
+        if (status === 'acknowledged') {
+          return {
+            label: 'Chiudi',
+            className: 'primary-button',
+            onClick: () => updateSafetyEventStatus(row.id, 'closed'),
+          };
+        }
+        return {
+          label: 'Prendi in carico',
+          className: 'primary-button',
+          onClick: () => updateSafetyEventStatus(row.id, 'acknowledged'),
+        };
+      },
+      columns: [
+        { label: 'Data', value: (row) => formatDateTime(row.created_at) },
+        { label: 'Giro', value: (row) => row.ride_title || row.ride_id || '-' },
+        { label: 'Utente', value: (row) => row.actor_nickname || '-' },
+        { label: 'Ruolo', value: (row) => formatUserType(row.actor_role) },
+        { label: 'Telefono', value: (row) => row.actor_phone_e164 || '-' },
+        {
+          label: 'Emergenza',
+          value: (row) => row.actor_emergency_phone_e164 || '-',
+        },
+        {
+          label: 'Evento',
+          render: (row) =>
+            `<span class="pill ${safetyEventTypeClass(row.event_type)}">${escapeHtml(
+              formatSafetyEventType(row.event_type),
+            )}</span>`,
+        },
+        { label: 'Messaggio', value: (row) => row.message || '-' },
+        {
+          label: 'Posizione',
+          render: (row) => renderSafetyLocation(row),
+        },
+        {
+          label: 'Stato',
+          render: (row) =>
+            `<span class="pill ${safetyStatusClass(row.status)}">${escapeHtml(
+              formatSafetyStatus(row.status),
+            )}</span>`,
+        },
+        { label: 'Azione', className: 'actions-col', action: true },
+      ],
+      searchText: (row) => [
+        row.ride_title,
+        row.ride_id,
+        row.actor_nickname,
+        row.actor_phone_e164,
+        row.actor_emergency_phone_e164,
+        row.event_type,
+        row.message,
+        row.status,
       ],
     },
     blockedWords: {
@@ -1305,6 +1426,19 @@
     }
   }
 
+  async function updateSafetyEventStatus(eventId, status) {
+    try {
+      await callRpc('admin_update_ride_safety_event_status', {
+        p_id: eventId,
+        p_status: status,
+      });
+      showFlash('Evento sicurezza aggiornato.', 'success');
+      await loadSection('safetyEvents');
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    }
+  }
+
   async function deleteSelectedRows() {
     const meta = sectionMeta[state.activeSection];
     const rowIds = Array.from(state.selectedRowIds);
@@ -1698,6 +1832,45 @@
     if (normalized === 'active') return 'is-active';
     if (normalized === 'hidden') return 'is-warning';
     return 'is-blocked';
+  }
+
+  function formatSafetyEventType(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'check_in_ok') return 'Sto bene';
+    if (normalized === 'assistance_request') return 'Richiesta supporto';
+    if (normalized === 'emergency_alert') return 'Emergenza';
+    return normalized || '-';
+  }
+
+  function safetyEventTypeClass(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'check_in_ok') return 'is-active';
+    if (normalized === 'assistance_request') return 'is-warning';
+    return 'is-blocked';
+  }
+
+  function formatSafetyStatus(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'open') return 'Aperto';
+    if (normalized === 'acknowledged') return 'In carico';
+    if (normalized === 'closed') return 'Chiuso';
+    return normalized || '-';
+  }
+
+  function safetyStatusClass(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'closed') return 'is-active';
+    if (normalized === 'acknowledged') return 'is-warning';
+    return 'is-blocked';
+  }
+
+  function renderSafetyLocation(row) {
+    const lat = Number(row.latitude);
+    const lon = Number(row.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return '-';
+    const label = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+    const href = `https://www.google.com/maps?q=${lat},${lon}`;
+    return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
   }
 
   function escapeHtml(value) {
