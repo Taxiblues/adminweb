@@ -359,6 +359,7 @@ code {
 
 .telemetry-panel,
 .app-update-panel,
+.announcements-panel,
 .events-panel,
 .communications-panel,
 .blocked-words-panel,
@@ -448,9 +449,35 @@ code {
   align-items: end;
 }
 
+.announcements-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+
 .events-description-field,
 .events-url-field {
   grid-column: span 2;
+}
+
+.announcements-body-field {
+  grid-column: 1 / -1;
+}
+
+.announcements-link-field {
+  grid-column: span 2;
+}
+
+.announcements-active-field {
+  min-height: 44px;
+}
+
+.announcements-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .events-poster-field,
@@ -726,6 +753,7 @@ th {
   .communications-meta-grid,
   .communications-form-grid,
   .events-form,
+  .announcements-form,
   .app-update-grid,
   .app-update-message-grid,
   .app-update-platform-fields,
@@ -738,11 +766,15 @@ th {
   .events-url-field,
   .events-poster-field,
   .event-poster-preview-wrap,
-  .events-actions {
+  .events-actions,
+  .announcements-body-field,
+  .announcements-link-field,
+  .announcements-actions {
     grid-column: 1;
   }
 
-  .telemetry-actions {
+  .telemetry-actions,
+  .announcements-actions {
     justify-content: stretch;
   }
 }

@@ -15,10 +15,10 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>Passengers Admin</title>
-    <link rel="stylesheet" href="./styles.css?v=20260507a" />
+    <link rel="stylesheet" href="./styles.css?v=20260515b" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=20260422a"></script>
-    <script defer src="./app.js?v=20260507a"></script>
+    <script defer src="./app.js?v=20260515b"></script>
   </head>
   <body>
     <div class="admin-shell">
@@ -65,6 +65,9 @@
           </button>
           <button class="menu-button" data-section="appUpdates" type="button">
             Aggiornamenti App
+          </button>
+          <button class="menu-button" data-section="announcements" type="button">
+            Avvisi App
           </button>
           <button class="menu-button" data-section="communications" type="button">
             Comunicazioni
@@ -316,6 +319,92 @@
                   Salva configurazione update
                 </button>
               </div>
+            </div>
+
+            <div id="announcementsPanel" class="announcements-panel hidden">
+              <div class="blocked-words-header">
+                <p class="eyebrow">Avviso in-app</p>
+                <p class="blocked-words-copy">
+                  Pubblica un popup che gli utenti loggati vedono una sola volta per ogni avviso creato.
+                </p>
+              </div>
+
+              <form id="announcementsForm" class="announcements-form">
+                <input id="announcementIdInput" type="hidden" />
+
+                <label class="field">
+                  <span>Titolo avviso</span>
+                  <input
+                    id="announcementTitleInput"
+                    type="text"
+                    maxlength="120"
+                    placeholder="es. Nuova promozione"
+                  />
+                </label>
+
+                <label class="field">
+                  <span>Target</span>
+                  <select id="announcementAudienceSelect" class="field-select">
+                    <option value="all">Tutti</option>
+                    <option value="biker">Bikers</option>
+                    <option value="passenger">Passengers</option>
+                  </select>
+                </label>
+
+                <label class="field">
+                  <span>Inizio visibilita</span>
+                  <input id="announcementStartsInput" type="datetime-local" />
+                </label>
+
+                <label class="field">
+                  <span>Fine visibilita</span>
+                  <input id="announcementEndsInput" type="datetime-local" />
+                </label>
+
+                <label class="toggle-field announcements-active-field">
+                  <input id="announcementActiveToggle" type="checkbox" />
+                  <span>Avviso attivo</span>
+                </label>
+
+                <label class="field announcements-body-field">
+                  <span>Testo informativo popup</span>
+                  <textarea
+                    id="announcementBodyInput"
+                    rows="5"
+                    maxlength="1200"
+                    placeholder="Scrivi il testo che verra mostrato nel popup"
+                  ></textarea>
+                </label>
+
+                <label class="field announcements-link-field">
+                  <span>Link web opzionale</span>
+                  <input
+                    id="announcementLinkUrlInput"
+                    type="url"
+                    maxlength="500"
+                    placeholder="https://..."
+                  />
+                </label>
+
+                <label class="field announcements-link-field">
+                  <span>Testo pulsante link</span>
+                  <input
+                    id="announcementLinkLabelInput"
+                    type="text"
+                    maxlength="60"
+                    placeholder="es. Scopri di piu"
+                  />
+                </label>
+
+                <div class="announcements-actions">
+                  <button id="announcementResetButton" class="ghost-button" type="button">
+                    Nuovo avviso
+                  </button>
+                  <button id="announcementSaveButton" class="primary-button" type="submit">
+                    Pubblica avviso
+                  </button>
+                </div>
+              </form>
             </div>
 
             <div id="summaryPanel" class="summary-panel hidden">

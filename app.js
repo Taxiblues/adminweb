@@ -49,6 +49,27 @@
   const iosLatestVersionInput = document.getElementById('iosLatestVersionInput');
   const iosStoreUrlInput = document.getElementById('iosStoreUrlInput');
   const appUpdateSaveButton = document.getElementById('appUpdateSaveButton');
+  const announcementsPanel = document.getElementById('announcementsPanel');
+  const announcementIdInput = document.getElementById('announcementIdInput');
+  const announcementTitleInput = document.getElementById('announcementTitleInput');
+  const announcementBodyInput = document.getElementById('announcementBodyInput');
+  const announcementLinkUrlInput = document.getElementById(
+    'announcementLinkUrlInput',
+  );
+  const announcementLinkLabelInput = document.getElementById(
+    'announcementLinkLabelInput',
+  );
+  const announcementAudienceSelect = document.getElementById(
+    'announcementAudienceSelect',
+  );
+  const announcementActiveToggle = document.getElementById(
+    'announcementActiveToggle',
+  );
+  const announcementStartsInput = document.getElementById('announcementStartsInput');
+  const announcementEndsInput = document.getElementById('announcementEndsInput');
+  const announcementResetButton = document.getElementById('announcementResetButton');
+  const announcementSaveButton = document.getElementById('announcementSaveButton');
+  const announcementsForm = document.getElementById('announcementsForm');
   const blockedWordsPanel = document.getElementById('blockedWordsPanel');
   const blockedWordsForm = document.getElementById('blockedWordsForm');
   const blockedWordInput = document.getElementById('blockedWordInput');
@@ -112,6 +133,18 @@
     telemetry: null,
     telemetryLogs: [],
     appUpdateSettings: null,
+    announcements: [],
+    announcementDraft: {
+      id: '',
+      title: '',
+      body: '',
+      linkUrl: '',
+      linkLabel: '',
+      audience: 'all',
+      isActive: true,
+      startsAt: '',
+      endsAt: '',
+    },
     communicationSummary: null,
     communicationDraft: {
       title: 'Aggiornamento Passengers',
@@ -665,6 +698,64 @@
       metricValue: () => 1,
       columns: [],
     },
+    announcements: {
+      title: 'Avvisi App',
+      description:
+        'Pubblica popup in-app mostrati una sola volta a ogni utente loggato per ogni avviso creato.',
+      listRpc: 'admin_list_app_announcements',
+      createRpc: 'admin_create_app_announcement',
+      updateRpc: 'admin_update_app_announcement',
+      deleteRpc: 'admin_delete_app_announcements',
+      dataKey: 'announcements',
+      rowSelectable: true,
+      deleteButtonLabel: 'Elimina avvisi',
+      deleteConfirmSingular: 'Confermi la cancellazione dell\'avviso selezionato?',
+      deleteConfirmPlural: (count) =>
+        `Confermi la cancellazione di ${count} avvisi selezionati?`,
+      deleteSuccessSingular: '1 avviso eliminato.',
+      deleteSuccessPlural: (count) => `${count} avvisi eliminati.`,
+      searchPlaceholder: 'Filtra per titolo, testo, target o admin',
+      rowAction: (row) => ({
+        label: 'Modifica',
+        className: 'ghost-button',
+        onClick: () => editAnnouncement(row),
+      }),
+      columns: [
+        { label: 'Titolo', value: (row) => row.title || '-' },
+        {
+          label: 'Link',
+          value: (row) => row.link_url || '-',
+        },
+        {
+          label: 'Target',
+          value: (row) => formatAnnouncementAudience(row.audience),
+        },
+        {
+          label: 'Stato',
+          render: (row) =>
+            `<span class="pill ${announcementStatusClass(row)}">${escapeHtml(
+              formatAnnouncementStatus(row),
+            )}</span>`,
+        },
+        { label: 'Visualizzazioni', value: (row) => row.view_count ?? 0 },
+        { label: 'Inizio', value: (row) => formatDateTime(row.starts_at) },
+        { label: 'Fine', value: (row) => formatDateTime(row.ends_at) },
+        { label: 'Creato da', value: (row) => row.created_by_username || '-' },
+        { label: 'Creato il', value: (row) => formatDateTime(row.created_at) },
+        { label: 'Azione', className: 'actions-col', action: true },
+      ],
+      searchText: (row) => [
+        row.title,
+        row.body,
+        row.link_url,
+        row.link_label,
+        row.audience,
+        formatAnnouncementAudience(row.audience),
+        formatAnnouncementStatus(row),
+        row.created_by_username,
+        row.updated_by_username,
+      ],
+    },
     communications: {
       title: 'Comunicazioni',
       description:
@@ -843,6 +934,7 @@
     const isSummarySection = state.activeSection === 'summary';
     const isTelemetrySection = state.activeSection === 'telemetry';
     const isAppUpdatesSection = state.activeSection === 'appUpdates';
+    const isAnnouncementsSection = state.activeSection === 'announcements';
     const isBlockedWordsSection = state.activeSection === 'blockedWords';
     const isCommunicationsSection = state.activeSection === 'communications';
     const isEventsSection = state.activeSection === 'events';
@@ -858,6 +950,7 @@
     summaryPanel.classList.toggle('hidden', !isSummarySection);
     telemetryPanel.classList.toggle('hidden', !isTelemetrySection);
     appUpdatePanel.classList.toggle('hidden', !isAppUpdatesSection);
+    announcementsPanel.classList.toggle('hidden', !isAnnouncementsSection);
     eventsPanel.classList.toggle('hidden', !isEventsSection);
     blockedWordsPanel.classList.toggle('hidden', !isBlockedWordsSection);
     communicationsPanel.classList.toggle('hidden', !isCommunicationsSection);
@@ -870,6 +963,7 @@
     if (isSummarySection) renderSummaryPanel();
     if (isTelemetrySection) renderTelemetryPanel();
     if (isAppUpdatesSection) renderAppUpdatePanel();
+    if (isAnnouncementsSection) renderAnnouncementsPanel();
     if (isCommunicationsSection) renderCommunicationsPanel();
     if (isEventsSection) renderEventsPanel();
 
@@ -1074,6 +1168,26 @@
     iosStoreUrlInput.value = settings.ios_store_url || '';
   }
 
+  function renderAnnouncementsPanel() {
+    const draft = state.announcementDraft;
+    announcementIdInput.value = draft.id;
+    announcementTitleInput.value = draft.title;
+    announcementBodyInput.value = draft.body;
+    announcementLinkUrlInput.value = draft.linkUrl;
+    announcementLinkLabelInput.value = draft.linkLabel;
+    announcementAudienceSelect.value = ['all', 'biker', 'passenger'].includes(
+      draft.audience,
+    )
+      ? draft.audience
+      : 'all';
+    announcementActiveToggle.checked = draft.isActive === true;
+    announcementStartsInput.value = draft.startsAt;
+    announcementEndsInput.value = draft.endsAt;
+    announcementSaveButton.textContent = draft.id
+      ? 'Aggiorna avviso'
+      : 'Pubblica avviso';
+  }
+
   function renderCommunicationsPanel() {
     const summary = state.communicationSummary || {};
     const windowDays = Number(
@@ -1178,6 +1292,53 @@
     eventPosterInput.value = '';
     renderEventsPanel();
     eventsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function resetAnnouncementForm() {
+    state.announcementDraft = {
+      id: '',
+      title: '',
+      body: '',
+      linkUrl: '',
+      linkLabel: '',
+      audience: 'all',
+      isActive: true,
+      startsAt: '',
+      endsAt: '',
+    };
+    renderAnnouncementsPanel();
+  }
+
+  function editAnnouncement(row) {
+    state.announcementDraft = {
+      id: String(row.id || ''),
+      title: row.title || '',
+      body: row.body || '',
+      linkUrl: row.link_url || '',
+      linkLabel: row.link_label || '',
+      audience: ['all', 'biker', 'passenger'].includes(
+        String(row.audience || '').toLowerCase(),
+      )
+        ? String(row.audience).toLowerCase()
+        : 'all',
+      isActive: row.is_active === true,
+      startsAt: toDateTimeLocalValue(row.starts_at),
+      endsAt: toDateTimeLocalValue(row.ends_at),
+    };
+    renderAnnouncementsPanel();
+    announcementsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function updateAnnouncementDraftFromInputs() {
+    state.announcementDraft.id = announcementIdInput.value.trim();
+    state.announcementDraft.title = announcementTitleInput.value.trim();
+    state.announcementDraft.body = announcementBodyInput.value.trim();
+    state.announcementDraft.linkUrl = announcementLinkUrlInput.value.trim();
+    state.announcementDraft.linkLabel = announcementLinkLabelInput.value.trim();
+    state.announcementDraft.audience = announcementAudienceSelect.value || 'all';
+    state.announcementDraft.isActive = announcementActiveToggle.checked;
+    state.announcementDraft.startsAt = announcementStartsInput.value;
+    state.announcementDraft.endsAt = announcementEndsInput.value;
   }
 
   async function fileToBase64(file) {
@@ -1550,6 +1711,86 @@
     }
   }
 
+  async function saveAnnouncement(event) {
+    event.preventDefault();
+    const meta = sectionMeta.announcements;
+    updateAnnouncementDraftFromInputs();
+
+    const title = state.announcementDraft.title;
+    const body = state.announcementDraft.body;
+    const linkUrl = state.announcementDraft.linkUrl;
+    const linkLabel = state.announcementDraft.linkLabel;
+    const startsAt = toIsoFromLocalInput(state.announcementDraft.startsAt);
+    const endsAt = toIsoFromLocalInput(state.announcementDraft.endsAt);
+
+    if (title.length < 3) {
+      showFlash('Inserisci un titolo di almeno 3 caratteri.', 'error');
+      announcementTitleInput.focus();
+      return;
+    }
+
+    if (body.length < 3) {
+      showFlash('Inserisci un testo di almeno 3 caratteri.', 'error');
+      announcementBodyInput.focus();
+      return;
+    }
+
+    if (linkUrl && !/^https?:\/\//i.test(linkUrl)) {
+      showFlash('Inserisci un link web valido che inizi con http:// o https://.', 'error');
+      announcementLinkUrlInput.focus();
+      return;
+    }
+
+    if (linkLabel && !linkUrl) {
+      showFlash('Inserisci anche il link web per usare il testo pulsante.', 'error');
+      announcementLinkUrlInput.focus();
+      return;
+    }
+
+    if (startsAt && endsAt && new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
+      showFlash('La fine visibilita deve essere successiva all\'inizio.', 'error');
+      announcementEndsInput.focus();
+      return;
+    }
+
+    announcementSaveButton.disabled = true;
+    announcementSaveButton.textContent = 'Salvataggio...';
+
+    const payload = {
+      p_title: title,
+      p_body: body,
+      p_audience: state.announcementDraft.audience,
+      p_is_active: state.announcementDraft.isActive,
+      p_starts_at: startsAt,
+      p_ends_at: endsAt,
+      p_link_url: linkUrl || null,
+      p_link_label: linkLabel || null,
+    };
+
+    try {
+      if (state.announcementDraft.id) {
+        await callRpc(meta.updateRpc, {
+          p_id: state.announcementDraft.id,
+          ...payload,
+        });
+        showFlash('Avviso aggiornato.', 'success');
+      } else {
+        await callRpc(meta.createRpc, payload);
+        showFlash('Avviso pubblicato.', 'success');
+      }
+
+      resetAnnouncementForm();
+      await loadSection('announcements');
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    } finally {
+      announcementSaveButton.disabled = false;
+      announcementSaveButton.textContent = state.announcementDraft.id
+        ? 'Aggiorna avviso'
+        : 'Pubblica avviso';
+    }
+  }
+
   function formatBroadcastStatus(value) {
     const status = String(value || '').trim().toLowerCase();
     switch (status) {
@@ -1566,6 +1807,34 @@
       default:
         return status || '-';
     }
+  }
+
+  function formatAnnouncementAudience(value) {
+    switch (String(value || '').trim().toLowerCase()) {
+      case 'biker':
+        return 'Bikers';
+      case 'passenger':
+        return 'Passengers';
+      default:
+        return 'Tutti';
+    }
+  }
+
+  function formatAnnouncementStatus(row) {
+    if (row.is_active !== true) return 'Nascosto';
+    const now = Date.now();
+    const startsAt = row.starts_at ? new Date(row.starts_at).getTime() : null;
+    const endsAt = row.ends_at ? new Date(row.ends_at).getTime() : null;
+    if (startsAt && !Number.isNaN(startsAt) && startsAt > now) return 'Programmato';
+    if (endsAt && !Number.isNaN(endsAt) && endsAt <= now) return 'Scaduto';
+    return 'Attivo';
+  }
+
+  function announcementStatusClass(row) {
+    const status = formatAnnouncementStatus(row);
+    if (status === 'Attivo') return 'is-active';
+    if (status === 'Programmato') return 'is-warning';
+    return 'is-blocked';
   }
 
   function broadcastStatusClass(value) {
@@ -1921,6 +2190,8 @@
     });
     telemetrySaveButton.addEventListener('click', saveTelemetrySettings);
     appUpdateSaveButton.addEventListener('click', saveAppUpdateSettings);
+    announcementsForm.addEventListener('submit', saveAnnouncement);
+    announcementResetButton.addEventListener('click', resetAnnouncementForm);
     blockedWordsForm.addEventListener('submit', addBlockedWord);
     eventsForm.addEventListener('submit', saveEvent);
     eventResetButton.addEventListener('click', resetEventForm);
