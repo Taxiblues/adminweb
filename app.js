@@ -1525,8 +1525,31 @@
     const { data, error } = await state.supabase.functions.invoke(name, {
       body,
     });
-    if (error) throw error;
+    if (error) {
+      throw new Error(await resolveEdgeFunctionError(error));
+    }
     return data;
+  }
+
+  async function resolveEdgeFunctionError(error) {
+    const fallback = normalizeError(error);
+    const response = error?.context;
+    if (!response || typeof response.clone !== 'function') return fallback;
+
+    try {
+      const payload = await response.clone().json();
+      if (payload?.error) return String(payload.error);
+      if (payload?.message) return String(payload.message);
+    } catch (_) {
+      try {
+        const text = await response.clone().text();
+        if (text.trim()) return text.trim();
+      } catch (_) {
+        return fallback;
+      }
+    }
+
+    return fallback;
   }
 
   async function loadRows(meta, params) {
