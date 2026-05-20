@@ -501,6 +501,23 @@ code {
   object-fit: cover;
 }
 
+.story-image-link {
+  display: inline-flex;
+  align-items: center;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.story-image-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .events-actions {
   display: flex;
   justify-content: flex-end;

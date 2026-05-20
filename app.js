@@ -124,6 +124,7 @@
     passengers: [],
     rides: [],
     events: [],
+    stories: [],
     illeciti: [],
     safetyEvents: [],
     blockedUsers: [],
@@ -444,6 +445,61 @@
         row.status,
         row.poster_image_path,
         row.external_url,
+      ],
+    },
+    stories: {
+      title: 'Storie',
+      description:
+        'Visualizza storie attive e scadute, con cancellazione amministrativa della riga e dell\'immagine nel bucket dedicato.',
+      listRpc: 'admin_list_stories',
+      listFunction: 'admin-list-stories',
+      deleteFunction: 'admin-delete-stories',
+      rowSelectable: true,
+      deleteConfirmSingular:
+        'Confermi la cancellazione della storia selezionata e della sua immagine?',
+      deleteConfirmPlural: (count) =>
+        `Confermi la cancellazione di ${count} storie selezionate e delle immagini associate?`,
+      deleteButtonLabel: 'Elimina storie',
+      deleteProgressLabel: 'Eliminazione...',
+      deleteSuccessSingular: '1 storia eliminata.',
+      deleteSuccessPlural: (count) => `${count} storie eliminate.`,
+      searchPlaceholder:
+        'Filtra per titolo, descrizione, autore, ruolo, stato o luogo',
+      columns: [
+        {
+          label: 'Immagine',
+          render: (row) => renderStoryImageCell(row),
+        },
+        { label: 'Titolo', value: (row) => row.title || '-' },
+        { label: 'Autore', value: (row) => row.author_nickname || '-' },
+        { label: 'Ruolo', value: (row) => formatUserType(row.author_type) },
+        {
+          label: 'Stato',
+          render: (row) =>
+            `<span class="pill ${storyLifecycleClass(row.lifecycle_status)}">${escapeHtml(
+              formatStoryLifecycle(row.lifecycle_status),
+            )}</span>`,
+        },
+        { label: 'Like', value: (row) => row.like_count ?? 0 },
+        { label: 'Luogo', value: (row) => row.location_label || '-' },
+        { label: 'Creata il', value: (row) => formatDateTime(row.created_at) },
+        { label: 'Scade il', value: (row) => formatDateTime(row.expires_at) },
+        { label: 'Path immagine', value: (row) => row.image_path || '-' },
+      ],
+      searchText: (row) => [
+        row.id,
+        row.title,
+        row.description,
+        row.author_nickname,
+        row.author_email,
+        row.author_type,
+        formatUserType(row.author_type),
+        row.status,
+        row.lifecycle_status,
+        formatStoryLifecycle(row.lifecycle_status),
+        row.location_label,
+        row.location_full_address,
+        row.image_path,
       ],
     },
     illeciti: {
@@ -1473,6 +1529,15 @@
     return data;
   }
 
+  async function loadRows(meta, params) {
+    if (meta.listFunction) {
+      const result = await invokeEdgeFunction(meta.listFunction, params || {});
+      if (Array.isArray(result)) return result;
+      return Array.isArray(result?.rows) ? result.rows : [];
+    }
+    return callRpc(meta.listRpc, params);
+  }
+
   async function ensureAdminContext() {
     try {
       const sessionResult = await state.supabase.auth.getSession();
@@ -1540,10 +1605,10 @@
         const settings = await callRpc(meta.getRpc);
         state.appUpdateSettings = settings || null;
       } else if (sectionName === 'rides') {
-        const rows = await callRpc(meta.listRpc, buildRideFilterPayload());
+        const rows = await loadRows(meta, buildRideFilterPayload());
         state.rides = Array.isArray(rows) ? rows : [];
       } else {
-        const rows = await callRpc(meta.listRpc);
+        const rows = await loadRows(meta);
         state[sectionName] = Array.isArray(rows) ? rows : [];
       }
       state.loadingSection = false;
@@ -1603,7 +1668,7 @@
   async function deleteSelectedRows() {
     const meta = sectionMeta[state.activeSection];
     const rowIds = Array.from(state.selectedRowIds);
-    if (!meta.deleteRpc || !rowIds.length) return;
+    if ((!meta.deleteRpc && !meta.deleteFunction) || !rowIds.length) return;
 
     const confirmMessage =
       rowIds.length === 1
@@ -2101,6 +2166,36 @@
     if (normalized === 'active') return 'is-active';
     if (normalized === 'hidden') return 'is-warning';
     return 'is-blocked';
+  }
+
+  function formatStoryLifecycle(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'active') return 'Attiva';
+    if (normalized === 'expired') return 'Scaduta';
+    if (normalized === 'hidden') return 'Nascosta';
+    return normalized || '-';
+  }
+
+  function storyLifecycleClass(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'active') return 'is-active';
+    if (normalized === 'expired') return 'is-warning';
+    return 'is-blocked';
+  }
+
+  function renderStoryImageCell(row) {
+    const signedUrl = String(row.image_signed_url || '').trim();
+    const imagePath = String(row.image_path || '').trim();
+    if (!signedUrl) return escapeHtml(imagePath || '-');
+    return `
+      <a class="story-image-link" href="${escapeHtml(
+        signedUrl,
+      )}" target="_blank" rel="noopener noreferrer">
+        <img class="story-image-thumb" src="${escapeHtml(
+          signedUrl,
+        )}" alt="${escapeHtml(row.title || 'Storia')}" />
+      </a>
+    `;
   }
 
   function formatSafetyEventType(value) {
