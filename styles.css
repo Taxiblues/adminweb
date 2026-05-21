@@ -387,6 +387,34 @@ code {
   gap: 20px;
 }
 
+.access-policy-panel {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(243, 154, 45, 0.28);
+  background: rgba(243, 154, 45, 0.08);
+}
+
+.access-policy-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 420px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: center;
+}
+
+.access-policy-toggle {
+  min-height: 56px;
+}
+
+.is-danger-text {
+  color: var(--danger);
+}
+
+.is-success-text {
+  color: var(--success);
+}
+
 .toggle-field {
   display: inline-flex;
   align-items: center;
@@ -767,6 +795,7 @@ th {
   .ride-filters,
   .telemetry-panel-grid,
   .telemetry-meta,
+  .access-policy-layout,
   .communications-meta-grid,
   .communications-form-grid,
   .events-form,

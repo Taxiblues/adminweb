@@ -27,6 +27,15 @@
   const tableState = document.getElementById('tableState');
   const summaryPanel = document.getElementById('summaryPanel');
   const summaryGrid = document.getElementById('summaryGrid');
+  const appAccessBlockedToggle = document.getElementById(
+    'appAccessBlockedToggle',
+  );
+  const appAccessCurrentMode = document.getElementById('appAccessCurrentMode');
+  const appAccessUpdatedAt = document.getElementById('appAccessUpdatedAt');
+  const appAccessMessageInput = document.getElementById(
+    'appAccessMessageInput',
+  );
+  const appAccessSaveButton = document.getElementById('appAccessSaveButton');
   const telemetryPanel = document.getElementById('telemetryPanel');
   const telemetryLevelSelect = document.getElementById('telemetryLevelSelect');
   const telemetryCurrentLevel = document.getElementById('telemetryCurrentLevel');
@@ -131,6 +140,7 @@
     blockedWords: [],
     communications: [],
     summary: null,
+    appAccessPolicy: null,
     telemetry: null,
     telemetryLogs: [],
     appUpdateSettings: null,
@@ -242,9 +252,11 @@
       description:
         'Sintesi rapida dei principali indicatori operativi dell’app.',
       getRpc: 'admin_get_summary',
+      accessPolicyGetRpc: 'admin_get_app_access_policy',
+      accessPolicyUpdateRpc: 'admin_update_app_access_policy',
       hideSearch: true,
       hideTable: true,
-      metricValue: () => 7,
+      metricValue: () => 8,
       columns: [],
     },
     riders: {
@@ -1107,6 +1119,17 @@
 
   function renderSummaryPanel() {
     const summary = state.summary || {};
+    const accessPolicy = state.appAccessPolicy || {};
+    const accessBlocked = accessPolicy.access_blocked === true;
+
+    appAccessBlockedToggle.checked = accessBlocked;
+    appAccessCurrentMode.textContent = accessBlocked ? 'Accesso bloccato' : 'Accesso consentito';
+    appAccessCurrentMode.className = accessBlocked ? 'is-danger-text' : 'is-success-text';
+    appAccessUpdatedAt.textContent = formatDateTime(accessPolicy.updated_at);
+    appAccessMessageInput.value =
+      accessPolicy.message ||
+      'L\'app e temporaneamente non disponibile. Riprova piu tardi.';
+
     const tiles = [
       {
         label: 'Numero di Biker registrati',
@@ -1142,6 +1165,11 @@
         label: 'Numero illeciti',
         value: summary.illeciti_total ?? 0,
         note: 'Segnalazioni illecite registrate',
+      },
+      {
+        label: 'Blocco accesso app',
+        value: accessBlocked ? 'Attivo' : 'Non attivo',
+        note: 'Policy globale letta all\'avvio dell\'app',
       },
     ];
 
@@ -1606,8 +1634,12 @@
     try {
       const meta = sectionMeta[sectionName];
       if (sectionName === 'summary') {
-        const summary = await callRpc(meta.getRpc);
+        const [summary, accessPolicy] = await Promise.all([
+          callRpc(meta.getRpc),
+          callRpc(meta.accessPolicyGetRpc),
+        ]);
         state.summary = summary || null;
+        state.appAccessPolicy = accessPolicy || null;
       } else if (sectionName === 'communications') {
         const [summary, rows] = await Promise.all([
           callRpc(meta.getRpc, {
@@ -1759,6 +1791,35 @@
     } finally {
       telemetrySaveButton.disabled = false;
       telemetrySaveButton.textContent = 'Salva soglia log';
+    }
+  }
+
+  async function saveAppAccessPolicy() {
+    const meta = sectionMeta.summary;
+    const message = appAccessMessageInput.value.trim();
+
+    if (message.length < 3) {
+      showFlash('Inserisci un messaggio di almeno 3 caratteri.', 'error');
+      appAccessMessageInput.focus();
+      return;
+    }
+
+    appAccessSaveButton.disabled = true;
+    appAccessSaveButton.textContent = 'Salvataggio...';
+
+    try {
+      const updated = await callRpc(meta.accessPolicyUpdateRpc, {
+        p_access_blocked: appAccessBlockedToggle.checked,
+        p_message: message,
+      });
+      state.appAccessPolicy = updated || null;
+      renderSummaryPanel();
+      showFlash('Blocco accesso app aggiornato.', 'success');
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    } finally {
+      appAccessSaveButton.disabled = false;
+      appAccessSaveButton.textContent = 'Salva blocco accesso';
     }
   }
 
@@ -2307,6 +2368,7 @@
       loadSection(sectionName);
     });
     telemetrySaveButton.addEventListener('click', saveTelemetrySettings);
+    appAccessSaveButton.addEventListener('click', saveAppAccessPolicy);
     appUpdateSaveButton.addEventListener('click', saveAppUpdateSettings);
     announcementsForm.addEventListener('submit', saveAnnouncement);
     announcementResetButton.addEventListener('click', resetAnnouncementForm);
