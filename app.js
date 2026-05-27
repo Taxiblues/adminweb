@@ -36,6 +36,18 @@
     'appAccessMessageInput',
   );
   const appAccessSaveButton = document.getElementById('appAccessSaveButton');
+  const summaryTelemetryLevelSelect = document.getElementById(
+    'summaryTelemetryLevelSelect',
+  );
+  const summaryTelemetryCurrentLevel = document.getElementById(
+    'summaryTelemetryCurrentLevel',
+  );
+  const summaryTelemetryUpdatedAt = document.getElementById(
+    'summaryTelemetryUpdatedAt',
+  );
+  const summaryTelemetrySaveButton = document.getElementById(
+    'summaryTelemetrySaveButton',
+  );
   const telemetryPanel = document.getElementById('telemetryPanel');
   const telemetryLevelSelect = document.getElementById('telemetryLevelSelect');
   const telemetryCurrentLevel = document.getElementById('telemetryCurrentLevel');
@@ -88,6 +100,7 @@
   const eventIdInput = document.getElementById('eventIdInput');
   const eventPosterPathInput = document.getElementById('eventPosterPathInput');
   const eventTitleInput = document.getElementById('eventTitleInput');
+  const eventRegionInput = document.getElementById('eventRegionInput');
   const eventDateInput = document.getElementById('eventDateInput');
   const eventExpiresInput = document.getElementById('eventExpiresInput');
   const eventStatusInput = document.getElementById('eventStatusInput');
@@ -166,6 +179,7 @@
       id: '',
       title: '',
       description: '',
+      regione: '',
       eventDate: '',
       expiresAt: '',
       status: 'active',
@@ -254,6 +268,8 @@
       getRpc: 'admin_get_summary',
       accessPolicyGetRpc: 'admin_get_app_access_policy',
       accessPolicyUpdateRpc: 'admin_update_app_access_policy',
+      telemetryGetRpc: 'admin_get_app_telemetry_settings',
+      telemetryUpdateRpc: 'admin_update_app_telemetry_settings',
       hideSearch: true,
       hideTable: true,
       metricValue: () => 8,
@@ -264,9 +280,11 @@
       description:
         'Elenco completo dei bikers con contatti sicurezza e possibilita di blocco tramite RPC.',
       listRpc: 'admin_list_riders',
+      listFunction: 'admin-list-user-media',
+      listFunctionPayload: { userType: 'riders' },
       toggleRpc: 'admin_set_rider_blocked',
       toggleParam: 'p_uid',
-      searchPlaceholder: 'Filtra per nickname o email',
+      searchPlaceholder: 'Filtra per nickname, email, telefono o path immagine',
       rowAction: (row) => {
         const isBlocked = row.bloccato === true;
         return {
@@ -276,6 +294,24 @@
         };
       },
       columns: [
+        {
+          label: 'Avatar',
+          render: (row) =>
+            renderUserImageCell({
+              signedUrl: row.avatar_signed_url,
+              imagePath: row.avatar_url,
+              label: `Avatar ${row.nickname || 'biker'}`,
+            }),
+        },
+        {
+          label: 'Moto',
+          render: (row) =>
+            renderUserImageCell({
+              signedUrl: row.moto_signed_url,
+              imagePath: row.foto_moto,
+              label: `Moto ${row.nickname || 'biker'}`,
+            }),
+        },
         { label: 'Nickname', value: (row) => row.nickname || '-' },
         { label: 'Email', value: (row) => row.email || '-' },
         { label: 'Telefono', value: (row) => row.phone_e164 || '-' },
@@ -308,6 +344,8 @@
         row.email,
         row.phone_e164,
         row.emergency_contact_phone_e164,
+        row.avatar_url,
+        row.foto_moto,
       ],
     },
     passengers: {
@@ -315,9 +353,11 @@
       description:
         'Elenco completo dei passengers con contatti sicurezza e possibilita di blocco tramite RPC.',
       listRpc: 'admin_list_passengers',
+      listFunction: 'admin-list-user-media',
+      listFunctionPayload: { userType: 'passengers' },
       toggleRpc: 'admin_set_passenger_blocked',
       toggleParam: 'p_uid',
-      searchPlaceholder: 'Filtra per nickname o email',
+      searchPlaceholder: 'Filtra per nickname, email, telefono o path immagine',
       rowAction: (row) => {
         const isBlocked = row.bloccato === true;
         return {
@@ -327,6 +367,15 @@
         };
       },
       columns: [
+        {
+          label: 'Avatar',
+          render: (row) =>
+            renderUserImageCell({
+              signedUrl: row.avatar_signed_url,
+              imagePath: row.avatar_url,
+              label: `Avatar ${row.nickname || 'passenger'}`,
+            }),
+        },
         { label: 'Nickname', value: (row) => row.nickname || '-' },
         { label: 'Email', value: (row) => row.email || '-' },
         { label: 'Telefono', value: (row) => row.phone_e164 || '-' },
@@ -359,6 +408,7 @@
         row.email,
         row.phone_e164,
         row.emergency_contact_phone_e164,
+        row.avatar_url,
       ],
     },
     rides: {
@@ -430,7 +480,7 @@
       deleteProgressLabel: 'Eliminazione...',
       deleteSuccessSingular: '1 evento eliminato.',
       deleteSuccessPlural: (count) => `${count} eventi eliminati.`,
-      searchPlaceholder: 'Filtra per titolo, descrizione, stato o link',
+      searchPlaceholder: 'Filtra per titolo, descrizione, regione, stato o link',
       rowAction: (row) => ({
         label: 'Modifica',
         className: 'ghost-button',
@@ -445,6 +495,7 @@
               formatEventStatus(row.status),
             )}</span>`,
         },
+        { label: 'Regione', value: (row) => row.regione || '-' },
         { label: 'Data evento', value: (row) => formatDateTime(row.event_date) },
         { label: 'Scadenza', value: (row) => formatDateTime(row.expires_at) },
         { label: 'Locandina', value: (row) => row.poster_image_path || '-' },
@@ -454,6 +505,7 @@
       searchText: (row) => [
         row.title,
         row.description,
+        row.regione,
         row.status,
         row.poster_image_path,
         row.external_url,
@@ -1129,6 +1181,11 @@
     appAccessMessageInput.value =
       accessPolicy.message ||
       'L\'app e temporaneamente non disponibile. Riprova piu tardi.';
+    renderTelemetrySettingsControls({
+      select: summaryTelemetryLevelSelect,
+      currentLabel: summaryTelemetryCurrentLevel,
+      updatedLabel: summaryTelemetryUpdatedAt,
+    });
 
     const tiles = [
       {
@@ -1170,6 +1227,11 @@
         label: 'Blocco accesso app',
         value: accessBlocked ? 'Attivo' : 'Non attivo',
         note: 'Policy globale letta all\'avvio dell\'app',
+      },
+      {
+        label: 'Telemetria log DB',
+        value: formatTelemetryLevel(state.telemetry?.remote_min_level || 'error'),
+        note: 'Soglia remota configurata per app_telemetry_events',
       },
     ];
 
@@ -1222,13 +1284,26 @@
   }
 
   function renderTelemetryPanel() {
+    renderTelemetrySettingsControls({
+      select: telemetryLevelSelect,
+      currentLabel: telemetryCurrentLevel,
+      updatedLabel: telemetryUpdatedAt,
+    });
+  }
+
+  function renderTelemetrySettingsControls({
+    select,
+    currentLabel,
+    updatedLabel,
+  }) {
     const settings = state.telemetry || {};
     const level = String(settings.remote_min_level || 'error').trim().toLowerCase();
-    telemetryLevelSelect.value = ['off', 'error', 'warning', 'info'].includes(level)
+    select.value = ['off', 'error', 'warning', 'info'].includes(level)
       ? level
       : 'error';
-    telemetryCurrentLevel.textContent = formatTelemetryLevel(level);
-    telemetryUpdatedAt.textContent = formatDateTime(settings.updated_at);
+    currentLabel.textContent = formatTelemetryLevel(level);
+    currentLabel.className = level === 'off' ? 'is-danger-text' : 'is-success-text';
+    updatedLabel.textContent = formatDateTime(settings.updated_at);
   }
 
   function renderAppUpdatePanel() {
@@ -1297,6 +1372,7 @@
   function renderEventsPanel() {
     eventIdInput.value = state.eventDraft.id;
     eventTitleInput.value = state.eventDraft.title;
+    eventRegionInput.value = state.eventDraft.regione;
     eventDescriptionInput.value = state.eventDraft.description;
     eventDateInput.value = state.eventDraft.eventDate;
     eventExpiresInput.value = state.eventDraft.expiresAt;
@@ -1342,6 +1418,7 @@
       id: '',
       title: '',
       description: '',
+      regione: '',
       eventDate: '',
       expiresAt: '',
       status: 'active',
@@ -1363,6 +1440,7 @@
       id: String(row.id || ''),
       title: row.title || '',
       description: row.description || '',
+      regione: row.regione || '',
       eventDate: toDateTimeLocalValue(row.event_date),
       expiresAt: toDateTimeLocalValue(row.expires_at),
       status: ['active', 'hidden'].includes(String(row.status || '').toLowerCase())
@@ -1457,6 +1535,7 @@
   function updateEventDraftFromInputs() {
     state.eventDraft.id = eventIdInput.value.trim();
     state.eventDraft.title = eventTitleInput.value.trim();
+    state.eventDraft.regione = eventRegionInput.value.trim();
     state.eventDraft.description = eventDescriptionInput.value.trim();
     state.eventDraft.eventDate = eventDateInput.value;
     state.eventDraft.expiresAt = eventExpiresInput.value;
@@ -1473,6 +1552,11 @@
     if (state.eventDraft.title.length < 3) {
       showFlash('Inserisci un titolo di almeno 3 caratteri.', 'error');
       eventTitleInput.focus();
+      return;
+    }
+    if (!state.eventDraft.regione) {
+      showFlash('Seleziona la regione dell\'evento.', 'error');
+      eventRegionInput.focus();
       return;
     }
 
@@ -1508,6 +1592,7 @@
       const payload = {
         p_title: state.eventDraft.title,
         p_description: state.eventDraft.description || null,
+        p_regione: state.eventDraft.regione,
         p_event_date: eventDate,
         p_expires_at: expiresAt,
         p_poster_image_path: state.eventDraft.posterImagePath,
@@ -1582,7 +1667,10 @@
 
   async function loadRows(meta, params) {
     if (meta.listFunction) {
-      const result = await invokeEdgeFunction(meta.listFunction, params || {});
+      const result = await invokeEdgeFunction(meta.listFunction, {
+        ...(meta.listFunctionPayload || {}),
+        ...(params || {}),
+      });
       if (Array.isArray(result)) return result;
       return Array.isArray(result?.rows) ? result.rows : [];
     }
@@ -1634,12 +1722,14 @@
     try {
       const meta = sectionMeta[sectionName];
       if (sectionName === 'summary') {
-        const [summary, accessPolicy] = await Promise.all([
+        const [summary, accessPolicy, telemetrySettings] = await Promise.all([
           callRpc(meta.getRpc),
           callRpc(meta.accessPolicyGetRpc),
+          callRpc(meta.telemetryGetRpc),
         ]);
         state.summary = summary || null;
         state.appAccessPolicy = accessPolicy || null;
+        state.telemetry = telemetrySettings || null;
       } else if (sectionName === 'communications') {
         const [summary, rows] = await Promise.all([
           callRpc(meta.getRpc, {
@@ -1772,10 +1862,35 @@
   }
 
   async function saveTelemetrySettings() {
+    await saveTelemetrySettingsFrom({
+      level: telemetryLevelSelect.value,
+      button: telemetrySaveButton,
+      progressText: 'Salvataggio...',
+      idleText: 'Salva soglia log',
+      afterSave: renderTelemetryPanel,
+    });
+  }
+
+  async function saveSummaryTelemetrySettings() {
+    await saveTelemetrySettingsFrom({
+      level: summaryTelemetryLevelSelect.value,
+      button: summaryTelemetrySaveButton,
+      progressText: 'Salvataggio...',
+      idleText: 'Salva telemetria',
+      afterSave: renderSummaryPanel,
+    });
+  }
+
+  async function saveTelemetrySettingsFrom({
+    level,
+    button,
+    progressText,
+    idleText,
+    afterSave,
+  }) {
     const meta = sectionMeta.telemetry;
-    const level = telemetryLevelSelect.value;
-    telemetrySaveButton.disabled = true;
-    telemetrySaveButton.textContent = 'Salvataggio...';
+    button.disabled = true;
+    button.textContent = progressText;
 
     try {
       const updated = await callRpc(meta.updateRpc, {
@@ -1784,13 +1899,13 @@
       state.telemetry = updated || {
         remote_min_level: level,
       };
-      renderTelemetryPanel();
+      afterSave();
       showFlash('Soglia telemetria aggiornata.', 'success');
     } catch (error) {
       showFlash(normalizeError(error), 'error');
     } finally {
-      telemetrySaveButton.disabled = false;
-      telemetrySaveButton.textContent = 'Salva soglia log';
+      button.disabled = false;
+      button.textContent = idleText;
     }
   }
 
@@ -2282,6 +2397,25 @@
     `;
   }
 
+  function renderUserImageCell({ signedUrl, imagePath, label }) {
+    const normalizedSignedUrl = String(signedUrl || '').trim();
+    const normalizedPath = String(imagePath || '').trim();
+    if (!normalizedSignedUrl) {
+      return `<span class="image-empty">${escapeHtml(normalizedPath || '-')}</span>`;
+    }
+    return `
+      <a class="story-image-link" href="${escapeHtml(
+        normalizedSignedUrl,
+      )}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(
+        normalizedPath || label || 'Immagine utente',
+      )}">
+        <img class="story-image-thumb" src="${escapeHtml(
+          normalizedSignedUrl,
+        )}" alt="${escapeHtml(label || 'Immagine utente')}" loading="lazy" />
+      </a>
+    `;
+  }
+
   function formatSafetyEventType(value) {
     const normalized = String(value || '').trim().toLowerCase();
     if (normalized === 'check_in_ok') return 'Sto bene';
@@ -2368,6 +2502,10 @@
       loadSection(sectionName);
     });
     telemetrySaveButton.addEventListener('click', saveTelemetrySettings);
+    summaryTelemetrySaveButton.addEventListener(
+      'click',
+      saveSummaryTelemetrySettings,
+    );
     appAccessSaveButton.addEventListener('click', saveAppAccessPolicy);
     appUpdateSaveButton.addEventListener('click', saveAppUpdateSettings);
     announcementsForm.addEventListener('submit', saveAnnouncement);

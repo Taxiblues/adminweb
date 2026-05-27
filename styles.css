@@ -546,6 +546,16 @@ code {
   object-fit: cover;
 }
 
+.image-empty {
+  display: inline-block;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
 .events-actions {
   display: flex;
   justify-content: flex-end;
