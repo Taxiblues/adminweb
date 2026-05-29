@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="./styles.css?v=20260521a" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=20260422a"></script>
-    <script defer src="./app.js?v=20260521a"></script>
+    <script defer src="./app.js?v=20260529a"></script>
   </head>
   <body>
     <div class="admin-shell">
@@ -71,6 +71,9 @@
           </button>
           <button class="menu-button" data-section="announcements" type="button">
             Avvisi App
+          </button>
+          <button class="menu-button" data-section="ads" type="button">
+            ADS
           </button>
           <button class="menu-button" data-section="communications" type="button">
             Comunicazioni
@@ -410,6 +413,112 @@
               </form>
             </div>
 
+            <div id="adsPanel" class="events-panel hidden">
+              <div class="blocked-words-header">
+                <p class="eyebrow">Advertising custom</p>
+                <p class="blocked-words-copy">
+                  Pubblica card promozionali Passengers nei feed Community, Amici, Eventi e Storie.
+                </p>
+              </div>
+
+              <form id="adsForm" class="events-form">
+                <input id="adIdInput" type="hidden" />
+                <input id="adImagePathInput" type="hidden" />
+
+                <label class="field">
+                  <span>Titolo</span>
+                  <input
+                    id="adTitleInput"
+                    type="text"
+                    maxlength="100"
+                    placeholder="es. Promo casco weekend"
+                  />
+                </label>
+
+                <label class="field">
+                  <span>Placement</span>
+                  <select id="adPlacementSelect" class="field-select">
+                    <option value="community">Community</option>
+                    <option value="friends">Amici</option>
+                    <option value="events">Eventi</option>
+                    <option value="stories">Storie</option>
+                  </select>
+                </label>
+
+                <label class="field">
+                  <span>Target</span>
+                  <select id="adAudienceSelect" class="field-select">
+                    <option value="all">Tutti</option>
+                    <option value="biker">Bikers</option>
+                    <option value="passenger">Passengers</option>
+                  </select>
+                </label>
+
+                <label class="field">
+                  <span>Priorita</span>
+                  <input id="adPriorityInput" type="number" step="1" value="0" />
+                </label>
+
+                <label class="field">
+                  <span>Inizio visibilita</span>
+                  <input id="adStartsInput" type="datetime-local" />
+                </label>
+
+                <label class="field">
+                  <span>Fine visibilita</span>
+                  <input id="adEndsInput" type="datetime-local" />
+                </label>
+
+                <label class="toggle-field announcements-active-field">
+                  <input id="adActiveToggle" type="checkbox" />
+                  <span>ADS attivo</span>
+                </label>
+
+                <label class="field events-description-field">
+                  <span>Testo card</span>
+                  <textarea
+                    id="adBodyInput"
+                    rows="3"
+                    maxlength="280"
+                    placeholder="Scrivi il testo mostrato nella card"
+                  ></textarea>
+                </label>
+
+                <label class="field events-url-field">
+                  <span>Link web opzionale</span>
+                  <input id="adTargetUrlInput" type="url" placeholder="https://..." />
+                </label>
+
+                <label class="field">
+                  <span>Testo CTA</span>
+                  <input
+                    id="adCtaLabelInput"
+                    type="text"
+                    maxlength="40"
+                    placeholder="es. Scopri di piu"
+                  />
+                </label>
+
+                <label class="field events-poster-field">
+                  <span>Immagine card</span>
+                  <input id="adImageInput" type="file" accept="image/*" />
+                </label>
+
+                <div class="event-poster-preview-wrap">
+                  <img id="adImagePreview" class="event-poster-preview hidden" alt="Anteprima ADS" />
+                </div>
+
+                <div class="events-actions">
+                  <button id="adResetButton" class="ghost-button" type="button">
+                    Nuovo ADS
+                  </button>
+                  <button id="adSaveButton" class="primary-button" type="submit">
+                    Salva ADS
+                  </button>
+                </div>
+              </form>
+            </div>
+
             <div id="summaryPanel" class="summary-panel hidden">
               <div class="access-policy-panel">
                 <div class="blocked-words-header">
@@ -488,6 +597,51 @@
                 <div class="telemetry-actions">
                   <button id="summaryTelemetrySaveButton" class="primary-button" type="button">
                     Salva telemetria
+                  </button>
+                </div>
+              </div>
+
+              <div class="access-policy-panel">
+                <div class="blocked-words-header">
+                  <p class="eyebrow">Accessi app</p>
+                  <p class="blocked-words-copy">
+                    Consulta gli utenti distinti che hanno aperto o ripreso l'app nel giorno selezionato, con distinzione per ruolo attivo.
+                  </p>
+                </div>
+
+                <div class="telemetry-panel-grid">
+                  <label class="field">
+                    <span>Giorno</span>
+                    <input id="appAccessDayInput" class="field-input" type="date" />
+                  </label>
+
+                  <div class="telemetry-meta">
+                    <div class="telemetry-meta-card">
+                      <span class="telemetry-meta-label">Utenti totali</span>
+                      <strong id="appAccessTotalUsers">0</strong>
+                    </div>
+                    <div class="telemetry-meta-card">
+                      <span class="telemetry-meta-label">Bikers</span>
+                      <strong id="appAccessBikerUsers">0</strong>
+                    </div>
+                    <div class="telemetry-meta-card">
+                      <span class="telemetry-meta-label">Passengers</span>
+                      <strong id="appAccessPassengerUsers">0</strong>
+                    </div>
+                    <div class="telemetry-meta-card">
+                      <span class="telemetry-meta-label">Ruolo ignoto</span>
+                      <strong id="appAccessUnknownUsers">0</strong>
+                    </div>
+                    <div class="telemetry-meta-card">
+                      <span class="telemetry-meta-label">Eventi registrati</span>
+                      <strong id="appAccessTotalEvents">0</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="telemetry-actions">
+                  <button id="appAccessRefreshButton" class="primary-button" type="button">
+                    Aggiorna accessi
                   </button>
                 </div>
               </div>

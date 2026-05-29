@@ -48,6 +48,19 @@
   const summaryTelemetrySaveButton = document.getElementById(
     'summaryTelemetrySaveButton',
   );
+  const appAccessDayInput = document.getElementById('appAccessDayInput');
+  const appAccessRefreshButton = document.getElementById(
+    'appAccessRefreshButton',
+  );
+  const appAccessTotalUsers = document.getElementById('appAccessTotalUsers');
+  const appAccessBikerUsers = document.getElementById('appAccessBikerUsers');
+  const appAccessPassengerUsers = document.getElementById(
+    'appAccessPassengerUsers',
+  );
+  const appAccessUnknownUsers = document.getElementById(
+    'appAccessUnknownUsers',
+  );
+  const appAccessTotalEvents = document.getElementById('appAccessTotalEvents');
   const telemetryPanel = document.getElementById('telemetryPanel');
   const telemetryLevelSelect = document.getElementById('telemetryLevelSelect');
   const telemetryCurrentLevel = document.getElementById('telemetryCurrentLevel');
@@ -91,6 +104,24 @@
   const announcementResetButton = document.getElementById('announcementResetButton');
   const announcementSaveButton = document.getElementById('announcementSaveButton');
   const announcementsForm = document.getElementById('announcementsForm');
+  const adsPanel = document.getElementById('adsPanel');
+  const adsForm = document.getElementById('adsForm');
+  const adIdInput = document.getElementById('adIdInput');
+  const adImagePathInput = document.getElementById('adImagePathInput');
+  const adTitleInput = document.getElementById('adTitleInput');
+  const adBodyInput = document.getElementById('adBodyInput');
+  const adTargetUrlInput = document.getElementById('adTargetUrlInput');
+  const adCtaLabelInput = document.getElementById('adCtaLabelInput');
+  const adPlacementSelect = document.getElementById('adPlacementSelect');
+  const adAudienceSelect = document.getElementById('adAudienceSelect');
+  const adPriorityInput = document.getElementById('adPriorityInput');
+  const adActiveToggle = document.getElementById('adActiveToggle');
+  const adStartsInput = document.getElementById('adStartsInput');
+  const adEndsInput = document.getElementById('adEndsInput');
+  const adImageInput = document.getElementById('adImageInput');
+  const adImagePreview = document.getElementById('adImagePreview');
+  const adResetButton = document.getElementById('adResetButton');
+  const adSaveButton = document.getElementById('adSaveButton');
   const blockedWordsPanel = document.getElementById('blockedWordsPanel');
   const blockedWordsForm = document.getElementById('blockedWordsForm');
   const blockedWordInput = document.getElementById('blockedWordInput');
@@ -154,10 +185,13 @@
     communications: [],
     summary: null,
     appAccessPolicy: null,
+    appAccessSummary: null,
+    appAccessSummaryDay: todayDateInputValue(),
     telemetry: null,
     telemetryLogs: [],
     appUpdateSettings: null,
     announcements: [],
+    ads: [],
     announcementDraft: {
       id: '',
       title: '',
@@ -165,6 +199,22 @@
       linkUrl: '',
       linkLabel: '',
       audience: 'all',
+      isActive: true,
+      startsAt: '',
+      endsAt: '',
+    },
+    adDraft: {
+      id: '',
+      title: '',
+      body: '',
+      imagePath: '',
+      imagePreviewUrl: '',
+      imageFile: null,
+      targetUrl: '',
+      ctaLabel: '',
+      placement: 'community',
+      audience: 'all',
+      priority: 0,
       isActive: true,
       startsAt: '',
       endsAt: '',
@@ -270,6 +320,7 @@
       accessPolicyUpdateRpc: 'admin_update_app_access_policy',
       telemetryGetRpc: 'admin_get_app_telemetry_settings',
       telemetryUpdateRpc: 'admin_update_app_telemetry_settings',
+      appAccessSummaryRpc: 'admin_get_app_access_summary',
       hideSearch: true,
       hideTable: true,
       metricValue: () => 8,
@@ -876,6 +927,72 @@
         row.updated_by_username,
       ],
     },
+    ads: {
+      title: 'ADS',
+      description:
+        'Gestisci le card advertising custom Passengers mostrate accanto agli slot native Google nei feed.',
+      listRpc: 'admin_list_app_custom_ads',
+      createRpc: 'admin_create_app_custom_ad',
+      updateRpc: 'admin_update_app_custom_ad',
+      deleteRpc: 'admin_delete_app_custom_ads',
+      deleteParam: 'p_ids',
+      rowSelectable: true,
+      deleteButtonLabel: 'Elimina ADS',
+      deleteConfirmSingular:
+        'Confermi la cancellazione dell\'ADS selezionato e della sua immagine?',
+      deleteConfirmPlural: (count) =>
+        `Confermi la cancellazione di ${count} ADS selezionati e delle immagini associate?`,
+      deleteSuccessSingular: '1 ADS eliminato.',
+      deleteSuccessPlural: (count) => `${count} ADS eliminati.`,
+      searchPlaceholder:
+        'Filtra per titolo, testo, placement, target, link o path immagine',
+      rowAction: (row) => ({
+        label: 'Modifica',
+        className: 'ghost-button',
+        onClick: () => editAd(row),
+      }),
+      columns: [
+        { label: 'Titolo', value: (row) => row.title || '-' },
+        {
+          label: 'Placement',
+          value: (row) => formatAdPlacement(row.placement),
+        },
+        {
+          label: 'Target',
+          value: (row) => formatAnnouncementAudience(row.audience),
+        },
+        {
+          label: 'Stato',
+          render: (row) =>
+            `<span class="pill ${announcementStatusClass(row)}">${escapeHtml(
+              formatAnnouncementStatus(row),
+            )}</span>`,
+        },
+        { label: 'Priorita', value: (row) => row.priority ?? 0 },
+        {
+          label: 'Impression',
+          value: (row) => row.impression_count ?? 0,
+        },
+        { label: 'Click', value: (row) => row.click_count ?? 0 },
+        { label: 'Inizio', value: (row) => formatDateTime(row.starts_at) },
+        { label: 'Fine', value: (row) => formatDateTime(row.ends_at) },
+        { label: 'Immagine', value: (row) => row.image_path || '-' },
+        { label: 'Link', value: (row) => row.target_url || '-' },
+        { label: 'Azione', className: 'actions-col', action: true },
+      ],
+      searchText: (row) => [
+        row.title,
+        row.body,
+        row.placement,
+        formatAdPlacement(row.placement),
+        row.audience,
+        formatAnnouncementAudience(row.audience),
+        formatAnnouncementStatus(row),
+        row.image_path,
+        row.target_url,
+        row.cta_label,
+      ],
+    },
     communications: {
       title: 'Comunicazioni',
       description:
@@ -1055,6 +1172,7 @@
     const isTelemetrySection = state.activeSection === 'telemetry';
     const isAppUpdatesSection = state.activeSection === 'appUpdates';
     const isAnnouncementsSection = state.activeSection === 'announcements';
+    const isAdsSection = state.activeSection === 'ads';
     const isBlockedWordsSection = state.activeSection === 'blockedWords';
     const isCommunicationsSection = state.activeSection === 'communications';
     const isEventsSection = state.activeSection === 'events';
@@ -1071,6 +1189,7 @@
     telemetryPanel.classList.toggle('hidden', !isTelemetrySection);
     appUpdatePanel.classList.toggle('hidden', !isAppUpdatesSection);
     announcementsPanel.classList.toggle('hidden', !isAnnouncementsSection);
+    adsPanel.classList.toggle('hidden', !isAdsSection);
     eventsPanel.classList.toggle('hidden', !isEventsSection);
     blockedWordsPanel.classList.toggle('hidden', !isBlockedWordsSection);
     communicationsPanel.classList.toggle('hidden', !isCommunicationsSection);
@@ -1084,6 +1203,7 @@
     if (isTelemetrySection) renderTelemetryPanel();
     if (isAppUpdatesSection) renderAppUpdatePanel();
     if (isAnnouncementsSection) renderAnnouncementsPanel();
+    if (isAdsSection) renderAdsPanel();
     if (isCommunicationsSection) renderCommunicationsPanel();
     if (isEventsSection) renderEventsPanel();
 
@@ -1172,6 +1292,7 @@
   function renderSummaryPanel() {
     const summary = state.summary || {};
     const accessPolicy = state.appAccessPolicy || {};
+    const accessSummary = state.appAccessSummary || {};
     const accessBlocked = accessPolicy.access_blocked === true;
 
     appAccessBlockedToggle.checked = accessBlocked;
@@ -1186,6 +1307,17 @@
       currentLabel: summaryTelemetryCurrentLevel,
       updatedLabel: summaryTelemetryUpdatedAt,
     });
+    appAccessDayInput.value =
+      state.appAccessSummaryDay || accessSummary.day || todayDateInputValue();
+    appAccessTotalUsers.textContent = String(accessSummary.total_users ?? 0);
+    appAccessBikerUsers.textContent = String(accessSummary.biker_users ?? 0);
+    appAccessPassengerUsers.textContent = String(
+      accessSummary.passenger_users ?? 0,
+    );
+    appAccessUnknownUsers.textContent = String(
+      accessSummary.unknown_users ?? 0,
+    );
+    appAccessTotalEvents.textContent = String(accessSummary.total_events ?? 0);
 
     const tiles = [
       {
@@ -1271,6 +1403,14 @@
       dateStyle: 'medium',
       timeStyle: 'short',
     }).format(date);
+  }
+
+  function todayDateInputValue() {
+    const date = new Date();
+    const pad = (number) => String(number).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+      date.getDate(),
+    )}`;
   }
 
   function formatJsonCell(value) {
@@ -1391,6 +1531,42 @@
     eventSaveButton.textContent = state.eventDraft.id ? 'Aggiorna evento' : 'Salva evento';
   }
 
+  function renderAdsPanel() {
+    adIdInput.value = state.adDraft.id;
+    adTitleInput.value = state.adDraft.title;
+    adBodyInput.value = state.adDraft.body;
+    adTargetUrlInput.value = state.adDraft.targetUrl;
+    adCtaLabelInput.value = state.adDraft.ctaLabel;
+    adImagePathInput.value = state.adDraft.imagePath;
+    adPlacementSelect.value = [
+      'community',
+      'friends',
+      'events',
+      'stories',
+    ].includes(state.adDraft.placement)
+      ? state.adDraft.placement
+      : 'community';
+    adAudienceSelect.value = ['all', 'biker', 'passenger'].includes(
+      state.adDraft.audience,
+    )
+      ? state.adDraft.audience
+      : 'all';
+    adPriorityInput.value = String(state.adDraft.priority ?? 0);
+    adActiveToggle.checked = state.adDraft.isActive === true;
+    adStartsInput.value = state.adDraft.startsAt;
+    adEndsInput.value = state.adDraft.endsAt;
+
+    if (state.adDraft.imagePreviewUrl) {
+      adImagePreview.src = state.adDraft.imagePreviewUrl;
+      adImagePreview.classList.remove('hidden');
+    } else {
+      adImagePreview.removeAttribute('src');
+      adImagePreview.classList.add('hidden');
+    }
+
+    adSaveButton.textContent = state.adDraft.id ? 'Aggiorna ADS' : 'Salva ADS';
+  }
+
   function toDateTimeLocalValue(value) {
     if (!value) return '';
     const date = new Date(value);
@@ -1431,6 +1607,31 @@
     renderEventsPanel();
   }
 
+  function resetAdForm() {
+    const objectUrl = state.adDraft.imagePreviewUrl || '';
+    if (objectUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(objectUrl);
+    }
+    state.adDraft = {
+      id: '',
+      title: '',
+      body: '',
+      imagePath: '',
+      imagePreviewUrl: '',
+      imageFile: null,
+      targetUrl: '',
+      ctaLabel: '',
+      placement: 'community',
+      audience: 'all',
+      priority: 0,
+      isActive: true,
+      startsAt: '',
+      endsAt: '',
+    };
+    adImageInput.value = '';
+    renderAdsPanel();
+  }
+
   function editEvent(row) {
     const objectUrl = state.eventDraft.posterPreviewUrl || '';
     if (objectUrl.startsWith('blob:')) {
@@ -1454,6 +1655,40 @@
     eventPosterInput.value = '';
     renderEventsPanel();
     eventsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function editAd(row) {
+    const objectUrl = state.adDraft.imagePreviewUrl || '';
+    if (objectUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(objectUrl);
+    }
+    state.adDraft = {
+      id: String(row.id || ''),
+      title: row.title || '',
+      body: row.body || '',
+      imagePath: row.image_path || '',
+      imagePreviewUrl: '',
+      imageFile: null,
+      targetUrl: row.target_url || '',
+      ctaLabel: row.cta_label || '',
+      placement: ['community', 'friends', 'events', 'stories'].includes(
+        String(row.placement || '').toLowerCase(),
+      )
+        ? String(row.placement).toLowerCase()
+        : 'community',
+      audience: ['all', 'biker', 'passenger'].includes(
+        String(row.audience || '').toLowerCase(),
+      )
+        ? String(row.audience).toLowerCase()
+        : 'all',
+      priority: Number.parseInt(row.priority ?? 0, 10) || 0,
+      isActive: row.is_active === true,
+      startsAt: toDateTimeLocalValue(row.starts_at),
+      endsAt: toDateTimeLocalValue(row.ends_at),
+    };
+    adImageInput.value = '';
+    renderAdsPanel();
+    adsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function resetAnnouncementForm() {
@@ -1532,6 +1767,23 @@
     };
   }
 
+  async function uploadAdImage(file) {
+    if (!file) return null;
+    const result = await invokeEdgeFunction('admin-custom-ad-image-upload', {
+      fileName: file.name,
+      contentType: file.type || 'image/jpeg',
+      base64: await fileToBase64(file),
+    });
+    const storagePath = String(result?.storagePath || '').trim();
+    if (!storagePath) {
+      throw new Error('Upload immagine ADS non riuscito.');
+    }
+    return {
+      storagePath,
+      displayUrl: String(result?.displayUrl || '').trim(),
+    };
+  }
+
   function updateEventDraftFromInputs() {
     state.eventDraft.id = eventIdInput.value.trim();
     state.eventDraft.title = eventTitleInput.value.trim();
@@ -1542,6 +1794,21 @@
     state.eventDraft.status = eventStatusInput.value || 'active';
     state.eventDraft.externalUrl = eventUrlInput.value.trim();
     state.eventDraft.posterImagePath = eventPosterPathInput.value.trim();
+  }
+
+  function updateAdDraftFromInputs() {
+    state.adDraft.id = adIdInput.value.trim();
+    state.adDraft.title = adTitleInput.value.trim();
+    state.adDraft.body = adBodyInput.value.trim();
+    state.adDraft.targetUrl = adTargetUrlInput.value.trim();
+    state.adDraft.ctaLabel = adCtaLabelInput.value.trim();
+    state.adDraft.imagePath = adImagePathInput.value.trim();
+    state.adDraft.placement = adPlacementSelect.value || 'community';
+    state.adDraft.audience = adAudienceSelect.value || 'all';
+    state.adDraft.priority = parseOptionalIntegerInput(adPriorityInput.value) ?? 0;
+    state.adDraft.isActive = adActiveToggle.checked;
+    state.adDraft.startsAt = adStartsInput.value;
+    state.adDraft.endsAt = adEndsInput.value;
   }
 
   async function saveEvent(event) {
@@ -1618,6 +1885,95 @@
     } finally {
       eventSaveButton.disabled = false;
       renderEventsPanel();
+    }
+  }
+
+  async function saveAd(event) {
+    event.preventDefault();
+    const meta = sectionMeta.ads;
+    updateAdDraftFromInputs();
+
+    const startsAt = toIsoFromLocalInput(state.adDraft.startsAt);
+    const endsAt = toIsoFromLocalInput(state.adDraft.endsAt);
+
+    if (state.adDraft.title.length < 3) {
+      showFlash('Inserisci un titolo ADS di almeno 3 caratteri.', 'error');
+      adTitleInput.focus();
+      return;
+    }
+
+    if (state.adDraft.body.length < 3) {
+      showFlash('Inserisci un testo ADS di almeno 3 caratteri.', 'error');
+      adBodyInput.focus();
+      return;
+    }
+
+    if (state.adDraft.targetUrl && !/^https?:\/\//i.test(state.adDraft.targetUrl)) {
+      showFlash('Inserisci un link ADS valido che inizi con http:// o https://.', 'error');
+      adTargetUrlInput.focus();
+      return;
+    }
+
+    if (state.adDraft.ctaLabel && !state.adDraft.targetUrl) {
+      showFlash('Inserisci anche il link web per usare il testo CTA.', 'error');
+      adTargetUrlInput.focus();
+      return;
+    }
+
+    if (startsAt && endsAt && new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
+      showFlash('La fine visibilita deve essere successiva all\'inizio.', 'error');
+      adEndsInput.focus();
+      return;
+    }
+
+    adSaveButton.disabled = true;
+    adSaveButton.textContent = 'Salvataggio...';
+
+    try {
+      if (state.adDraft.imageFile) {
+        const upload = await uploadAdImage(state.adDraft.imageFile);
+        state.adDraft.imagePath = upload.storagePath;
+        state.adDraft.imagePreviewUrl = upload.displayUrl || state.adDraft.imagePreviewUrl;
+      }
+
+      if (!state.adDraft.imagePath) {
+        showFlash('Carica un\'immagine per l\'ADS.', 'error');
+        adImageInput.focus();
+        return;
+      }
+
+      const payload = {
+        p_title: state.adDraft.title,
+        p_body: state.adDraft.body,
+        p_image_path: state.adDraft.imagePath,
+        p_target_url: state.adDraft.targetUrl || null,
+        p_cta_label: state.adDraft.ctaLabel || null,
+        p_placement: state.adDraft.placement,
+        p_audience: state.adDraft.audience,
+        p_is_active: state.adDraft.isActive,
+        p_starts_at: startsAt,
+        p_ends_at: endsAt,
+        p_priority: state.adDraft.priority,
+      };
+
+      if (state.adDraft.id) {
+        await callRpc(meta.updateRpc, {
+          p_id: Number(state.adDraft.id),
+          ...payload,
+        });
+        showFlash('ADS aggiornato.', 'success');
+      } else {
+        await callRpc(meta.createRpc, payload);
+        showFlash('ADS creato.', 'success');
+      }
+
+      resetAdForm();
+      await loadSection('ads');
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    } finally {
+      adSaveButton.disabled = false;
+      renderAdsPanel();
     }
   }
 
@@ -1722,14 +2078,18 @@
     try {
       const meta = sectionMeta[sectionName];
       if (sectionName === 'summary') {
-        const [summary, accessPolicy, telemetrySettings] = await Promise.all([
+        const [summary, accessPolicy, telemetrySettings, appAccessSummary] = await Promise.all([
           callRpc(meta.getRpc),
           callRpc(meta.accessPolicyGetRpc),
           callRpc(meta.telemetryGetRpc),
+          callRpc(meta.appAccessSummaryRpc, {
+            p_day: state.appAccessSummaryDay || todayDateInputValue(),
+          }),
         ]);
         state.summary = summary || null;
         state.appAccessPolicy = accessPolicy || null;
         state.telemetry = telemetrySettings || null;
+        state.appAccessSummary = appAccessSummary || null;
       } else if (sectionName === 'communications') {
         const [summary, rows] = await Promise.all([
           callRpc(meta.getRpc, {
@@ -1879,6 +2239,27 @@
       idleText: 'Salva telemetria',
       afterSave: renderSummaryPanel,
     });
+  }
+
+  async function refreshAppAccessSummary() {
+    const meta = sectionMeta.summary;
+    const selectedDay = appAccessDayInput.value || todayDateInputValue();
+    state.appAccessSummaryDay = selectedDay;
+    appAccessRefreshButton.disabled = true;
+    appAccessRefreshButton.textContent = 'Caricamento...';
+
+    try {
+      state.appAccessSummary = await callRpc(meta.appAccessSummaryRpc, {
+        p_day: selectedDay,
+      });
+      renderSummaryPanel();
+      showFlash('Accessi app aggiornati.', 'success');
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    } finally {
+      appAccessRefreshButton.disabled = false;
+      appAccessRefreshButton.textContent = 'Aggiorna accessi';
+    }
   }
 
   async function saveTelemetrySettingsFrom({
@@ -2081,6 +2462,19 @@
         return 'Passengers';
       default:
         return 'Tutti';
+    }
+  }
+
+  function formatAdPlacement(value) {
+    switch (String(value || '').trim().toLowerCase()) {
+      case 'friends':
+        return 'Amici';
+      case 'events':
+        return 'Eventi';
+      case 'stories':
+        return 'Storie';
+      default:
+        return 'Community';
     }
   }
 
@@ -2506,10 +2900,14 @@
       'click',
       saveSummaryTelemetrySettings,
     );
+    appAccessRefreshButton.addEventListener('click', refreshAppAccessSummary);
+    appAccessDayInput.addEventListener('change', refreshAppAccessSummary);
     appAccessSaveButton.addEventListener('click', saveAppAccessPolicy);
     appUpdateSaveButton.addEventListener('click', saveAppUpdateSettings);
     announcementsForm.addEventListener('submit', saveAnnouncement);
     announcementResetButton.addEventListener('click', resetAnnouncementForm);
+    adsForm.addEventListener('submit', saveAd);
+    adResetButton.addEventListener('click', resetAdForm);
     blockedWordsForm.addEventListener('submit', addBlockedWord);
     eventsForm.addEventListener('submit', saveEvent);
     eventResetButton.addEventListener('click', resetEventForm);
@@ -2523,6 +2921,17 @@
       state.eventDraft.posterFile = file || null;
       state.eventDraft.posterPreviewUrl = file ? URL.createObjectURL(file) : '';
       renderEventsPanel();
+    });
+    adImageInput.addEventListener('change', (event) => {
+      updateAdDraftFromInputs();
+      const file = event.target.files && event.target.files[0];
+      const objectUrl = state.adDraft.imagePreviewUrl || '';
+      if (objectUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(objectUrl);
+      }
+      state.adDraft.imageFile = file || null;
+      state.adDraft.imagePreviewUrl = file ? URL.createObjectURL(file) : '';
+      renderAdsPanel();
     });
     communicationTitleInput.addEventListener('input', (event) => {
       state.communicationDraft.title = event.target.value;
