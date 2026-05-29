@@ -323,7 +323,7 @@
       appAccessSummaryRpc: 'admin_get_app_access_summary',
       hideSearch: true,
       hideTable: true,
-      metricValue: () => 9,
+      metricValue: () => 8,
       columns: [],
     },
     riders: {
@@ -1336,19 +1336,14 @@
         note: 'Record in rides con status = open e start_time futura',
       },
       {
-        label: 'Numero di uscite confermate',
+        label: 'Numero di uscite accettate',
         value: summary.rides_confirmed ?? 0,
-        note: 'Record in rides con status = closed',
+        note: 'Giri accettati: record in rides con status = closed',
       },
       {
-        label: 'Numero di uscite prenotate',
+        label: 'Numero di uscite completate',
         value: summary.rides_completed ?? 0,
         note: 'Record in rides con status = completed',
-      },
-      {
-        label: 'Numero uscite cancellate',
-        value: summary.rides_deleted ?? 0,
-        note: 'Record in rides con status = deleted',
       },
       {
         label: 'Numero utenti bloccati',
