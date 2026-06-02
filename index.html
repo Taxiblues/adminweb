@@ -15,10 +15,10 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>Passengers Admin</title>
-    <link rel="stylesheet" href="./styles.css?v=20260521a" />
+    <link rel="stylesheet" href="./styles.css?v=20260602a" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=20260422a"></script>
-    <script defer src="./app.js?v=20260529b"></script>
+    <script defer src="./app.js?v=20260602a"></script>
   </head>
   <body>
     <div class="admin-shell">
@@ -77,6 +77,9 @@
           </button>
           <button class="menu-button" data-section="communications" type="button">
             Comunicazioni
+          </button>
+          <button class="menu-button" data-section="support" type="button">
+            Supporto
           </button>
         </nav>
 
@@ -842,6 +845,58 @@
                 <button id="communicationSendButton" class="primary-button" type="button">
                   Invia notifica broadcast
                 </button>
+              </div>
+            </div>
+
+            <div id="supportPanel" class="support-panel hidden">
+              <div class="blocked-words-header">
+                <p class="eyebrow">Chat supporto</p>
+                <p class="blocked-words-copy">
+                  Apri una conversazione dalla tabella e rispondi agli utenti tramite RPC amministrative.
+                </p>
+              </div>
+
+              <div id="supportEmptyState" class="support-empty-state">
+                Seleziona una chat supporto dall'elenco.
+              </div>
+
+              <div id="supportConversation" class="support-conversation hidden">
+                <div class="support-conversation-header">
+                  <div>
+                    <p class="eyebrow">Conversazione</p>
+                    <h3 id="supportThreadTitle">-</h3>
+                    <p id="supportThreadMeta" class="blocked-words-copy">-</p>
+                  </div>
+                  <div class="support-status-actions">
+                    <button id="supportCloseButton" class="ghost-button" type="button">
+                      Chiudi
+                    </button>
+                    <button id="supportReopenButton" class="ghost-button" type="button">
+                      Riapri
+                    </button>
+                  </div>
+                </div>
+
+                <div id="supportMessagesList" class="support-messages-list"></div>
+
+                <label class="field">
+                  <span>Risposta amministratore</span>
+                  <textarea
+                    id="supportReplyInput"
+                    rows="4"
+                    maxlength="500"
+                    placeholder="Scrivi la risposta da inviare all'utente"
+                  ></textarea>
+                </label>
+
+                <div class="support-reply-actions">
+                  <button id="supportRefreshButton" class="ghost-button" type="button">
+                    Aggiorna messaggi
+                  </button>
+                  <button id="supportSendButton" class="primary-button" type="button">
+                    Invia risposta
+                  </button>
+                </div>
               </div>
             </div>
 

@@ -166,6 +166,17 @@
   const communicationSendButton = document.getElementById(
     'communicationSendButton',
   );
+  const supportPanel = document.getElementById('supportPanel');
+  const supportEmptyState = document.getElementById('supportEmptyState');
+  const supportConversation = document.getElementById('supportConversation');
+  const supportThreadTitle = document.getElementById('supportThreadTitle');
+  const supportThreadMeta = document.getElementById('supportThreadMeta');
+  const supportMessagesList = document.getElementById('supportMessagesList');
+  const supportReplyInput = document.getElementById('supportReplyInput');
+  const supportSendButton = document.getElementById('supportSendButton');
+  const supportRefreshButton = document.getElementById('supportRefreshButton');
+  const supportCloseButton = document.getElementById('supportCloseButton');
+  const supportReopenButton = document.getElementById('supportReopenButton');
 
   const state = {
     supabase: null,
@@ -183,6 +194,9 @@
     blockedUsers: [],
     blockedWords: [],
     communications: [],
+    support: [],
+    supportSelectedThread: null,
+    supportMessages: [],
     summary: null,
     appAccessPolicy: null,
     appAccessSummary: null,
@@ -245,6 +259,7 @@
     },
     search: '',
     loadingSection: false,
+    loadingSupportMessages: false,
   };
 
   const authSessionStorage = createScopedSessionStorage();
@@ -1059,6 +1074,44 @@
         row.last_error,
       ],
     },
+    support: {
+      title: 'Supporto',
+      description:
+        'Conversazioni di supporto aperte dagli utenti nell\'app. Gli admin rispondono solo tramite RPC.',
+      listRpc: 'admin_support_list_threads',
+      dataKey: 'support',
+      searchPlaceholder: 'Filtra per nickname, email, ruolo, stato o ultimo messaggio',
+      rowAction: (row) => ({
+        label: 'Apri',
+        className: 'primary-button',
+        onClick: () => openSupportThread(row),
+      }),
+      columns: [
+        { label: 'Utente', value: (row) => row.user_nickname || '-' },
+        { label: 'Email', value: (row) => row.user_email || '-' },
+        { label: 'Ruolo', value: (row) => formatUserType(row.user_type) },
+        {
+          label: 'Stato',
+          render: (row) =>
+            `<span class="pill ${supportStatusClass(row.status)}">${escapeHtml(
+              formatSupportStatus(row.status),
+            )}</span>`,
+        },
+        { label: 'Messaggi', value: (row) => row.message_count ?? 0 },
+        { label: 'Ultimo messaggio', value: (row) => row.last_message_body || '-' },
+        { label: 'Aggiornata il', value: (row) => formatDateTime(row.last_message_at) },
+        { label: 'Azione', className: 'actions-col', action: true },
+      ],
+      searchText: (row) => [
+        row.user_nickname,
+        row.user_email,
+        row.user_type,
+        formatUserType(row.user_type),
+        row.status,
+        formatSupportStatus(row.status),
+        row.last_message_body,
+      ],
+    },
   };
 
   function showFlash(message, variant) {
@@ -1175,6 +1228,7 @@
     const isAdsSection = state.activeSection === 'ads';
     const isBlockedWordsSection = state.activeSection === 'blockedWords';
     const isCommunicationsSection = state.activeSection === 'communications';
+    const isSupportSection = state.activeSection === 'support';
     const isEventsSection = state.activeSection === 'events';
     const rows = getFilteredRows();
 
@@ -1193,6 +1247,7 @@
     eventsPanel.classList.toggle('hidden', !isEventsSection);
     blockedWordsPanel.classList.toggle('hidden', !isBlockedWordsSection);
     communicationsPanel.classList.toggle('hidden', !isCommunicationsSection);
+    supportPanel.classList.toggle('hidden', !isSupportSection);
     tableHead.parentElement.parentElement.classList.toggle(
       'hidden',
       meta.hideTable === true,
@@ -1205,6 +1260,7 @@
     if (isAnnouncementsSection) renderAnnouncementsPanel();
     if (isAdsSection) renderAdsPanel();
     if (isCommunicationsSection) renderCommunicationsPanel();
+    if (isSupportSection) renderSupportPanel();
     if (isEventsSection) renderEventsPanel();
 
     if (meta.hideTable === true) {
@@ -2504,6 +2560,24 @@
     return 'is-blocked';
   }
 
+  function formatSupportStatus(value) {
+    switch (String(value || '').trim().toLowerCase()) {
+      case 'pending_admin':
+        return 'Da rispondere';
+      case 'closed':
+        return 'Chiusa';
+      default:
+        return 'Aperta';
+    }
+  }
+
+  function supportStatusClass(value) {
+    const status = String(value || '').trim().toLowerCase();
+    if (status === 'closed') return 'is-blocked';
+    if (status === 'pending_admin') return 'is-warning';
+    return 'is-active';
+  }
+
   function formatBroadcastTarget(row) {
     const platform = row.target_platform ? row.target_platform.toUpperCase() : 'Tutti';
     const days = Number(row.active_within_days || 30);
@@ -2610,6 +2684,146 @@
     } finally {
       communicationSendButton.disabled = false;
       communicationSendButton.textContent = 'Invia notifica broadcast';
+    }
+  }
+
+  function renderSupportPanel() {
+    const selected = state.supportSelectedThread;
+    const hasSelected = !!selected;
+    supportEmptyState.classList.toggle('hidden', hasSelected);
+    supportConversation.classList.toggle('hidden', !hasSelected);
+    if (!hasSelected) return;
+
+    const status = String(selected.status || 'open').trim().toLowerCase();
+    supportThreadTitle.textContent = selected.user_nickname || 'Utente';
+    supportThreadMeta.textContent = [
+      formatUserType(selected.user_type),
+      selected.user_email || null,
+      `Stato: ${formatSupportStatus(status)}`,
+      `Aggiornata: ${formatDateTime(selected.last_message_at)}`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    supportCloseButton.classList.toggle('hidden', status === 'closed');
+    supportReopenButton.classList.toggle('hidden', status !== 'closed');
+
+    renderSupportMessages();
+  }
+
+  function renderSupportMessages() {
+    supportMessagesList.innerHTML = '';
+
+    if (state.loadingSupportMessages) {
+      supportMessagesList.innerHTML = '<div class="support-empty-state">Caricamento messaggi...</div>';
+      return;
+    }
+
+    if (!state.supportMessages.length) {
+      supportMessagesList.innerHTML = '<div class="support-empty-state">Nessun messaggio disponibile.</div>';
+      return;
+    }
+
+    state.supportMessages.forEach((message) => {
+      const article = document.createElement('article');
+      const role = String(message.sender_role || '').trim().toLowerCase();
+      article.className = `support-message ${role === 'admin' ? 'is-admin' : 'is-user'}`;
+      article.innerHTML = `
+        <div class="support-message-meta">
+          <strong>${escapeHtml(role === 'admin' ? 'Admin' : 'Utente')}</strong>
+          <span>${escapeHtml(formatDateTime(message.created_at))}</span>
+        </div>
+        <p>${escapeHtml(message.body || '')}</p>
+      `;
+      supportMessagesList.appendChild(article);
+    });
+
+    supportMessagesList.scrollTop = supportMessagesList.scrollHeight;
+  }
+
+  async function openSupportThread(row) {
+    state.supportSelectedThread = row;
+    state.supportMessages = [];
+    renderSupportPanel();
+    await loadSupportMessages(row.thread_id || row.id);
+  }
+
+  async function loadSupportMessages(threadId) {
+    const normalizedId = Number(threadId);
+    if (!Number.isFinite(normalizedId) || normalizedId <= 0) return;
+    state.loadingSupportMessages = true;
+    renderSupportPanel();
+    try {
+      const rows = await callRpc('admin_support_list_messages', {
+        p_thread_id: normalizedId,
+      });
+      state.supportMessages = Array.isArray(rows) ? rows : [];
+      state.loadingSupportMessages = false;
+      renderSupportPanel();
+    } catch (error) {
+      state.loadingSupportMessages = false;
+      renderSupportPanel();
+      showFlash(normalizeError(error), 'error');
+    }
+  }
+
+  async function sendSupportReply() {
+    const selected = state.supportSelectedThread;
+    const threadId = Number(selected?.thread_id || selected?.id);
+    const body = supportReplyInput.value.trim();
+
+    if (!Number.isFinite(threadId) || threadId <= 0) {
+      showFlash('Seleziona una conversazione supporto.', 'error');
+      return;
+    }
+    if (body.length < 2) {
+      showFlash('Inserisci una risposta di almeno 2 caratteri.', 'error');
+      supportReplyInput.focus();
+      return;
+    }
+
+    supportSendButton.disabled = true;
+    supportSendButton.textContent = 'Invio...';
+
+    try {
+      await callRpc('admin_support_send_message', {
+        p_thread_id: threadId,
+        p_body: body,
+      });
+      supportReplyInput.value = '';
+      showFlash('Risposta inviata.', 'success');
+      await loadSupportMessages(threadId);
+      await loadSection('support');
+      const refreshed = state.support.find((row) => Number(row.thread_id) === threadId);
+      if (refreshed) {
+        state.supportSelectedThread = refreshed;
+        renderSupportPanel();
+      }
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+      supportReplyInput.focus();
+    } finally {
+      supportSendButton.disabled = false;
+      supportSendButton.textContent = 'Invia risposta';
+    }
+  }
+
+  async function updateSupportThreadStatus(status) {
+    const selected = state.supportSelectedThread;
+    const threadId = Number(selected?.thread_id || selected?.id);
+    if (!Number.isFinite(threadId) || threadId <= 0) return;
+
+    try {
+      await callRpc('admin_support_update_thread_status', {
+        p_thread_id: threadId,
+        p_status: status,
+      });
+      showFlash(status === 'closed' ? 'Chat supporto chiusa.' : 'Chat supporto riaperta.', 'success');
+      await loadSection('support');
+      const refreshed = state.support.find((row) => Number(row.thread_id) === threadId);
+      state.supportSelectedThread = refreshed || { ...selected, status };
+      renderSupportPanel();
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
     }
   }
 
@@ -2940,6 +3154,14 @@
       state.communicationDraft.body = event.target.value;
     });
     communicationSendButton.addEventListener('click', sendCommunicationBroadcast);
+    supportSendButton.addEventListener('click', sendSupportReply);
+    supportRefreshButton.addEventListener('click', () => {
+      const selected = state.supportSelectedThread;
+      const threadId = selected?.thread_id || selected?.id;
+      loadSupportMessages(threadId);
+    });
+    supportCloseButton.addEventListener('click', () => updateSupportThreadStatus('closed'));
+    supportReopenButton.addEventListener('click', () => updateSupportThreadStatus('open'));
   }
 
   function renderEnvironmentBadge() {

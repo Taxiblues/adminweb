@@ -362,6 +362,7 @@ code {
 .announcements-panel,
 .events-panel,
 .communications-panel,
+.support-panel,
 .blocked-words-panel,
 .summary-panel {
   display: grid;
@@ -591,6 +592,86 @@ code {
   gap: 16px;
 }
 
+.support-empty-state {
+  padding: 18px;
+  border: 1px dashed var(--panel-border);
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.support-conversation {
+  display: grid;
+  gap: 16px;
+}
+
+.support-conversation-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.support-conversation-header h3 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.support-status-actions,
+.support-reply-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.support-messages-list {
+  display: grid;
+  gap: 12px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.support-message {
+  width: min(78%, 720px);
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.support-message.is-admin {
+  justify-self: end;
+  border-color: rgba(243, 154, 45, 0.38);
+  background: rgba(243, 154, 45, 0.12);
+}
+
+.support-message.is-user {
+  justify-self: start;
+}
+
+.support-message-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.support-message p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
 .app-update-platform-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -797,9 +878,16 @@ th {
   .hero,
   .toolbar,
   .bulk-actions,
-  .communications-footer {
+  .communications-footer,
+  .support-conversation-header,
+  .support-status-actions,
+  .support-reply-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .support-message {
+    width: 100%;
   }
 
   .ride-filters,
