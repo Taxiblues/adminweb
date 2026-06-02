@@ -2847,10 +2847,19 @@
     supportSendButton.textContent = 'Invio...';
 
     try {
-      await callRpc('admin_support_send_message', {
+      const sent = await callRpc('admin_support_send_message', {
         p_thread_id: threadId,
         p_body: body,
       });
+      if (sent?.id) {
+        invokeEdgeFunction('send-push', {
+          type: 'support_admin_reply_created',
+          support_thread_id: String(threadId),
+          support_message_id: String(sent.id),
+        }).catch((error) => {
+          console.warn('Support reply push failed', error);
+        });
+      }
       supportReplyInput.value = '';
       showFlash('Risposta inviata.', 'success');
       await loadSupportMessages(threadId);
