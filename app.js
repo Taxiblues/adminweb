@@ -177,6 +177,7 @@
   const supportRefreshButton = document.getElementById('supportRefreshButton');
   const supportCloseButton = document.getElementById('supportCloseButton');
   const supportReopenButton = document.getElementById('supportReopenButton');
+  const SUPPORT_AUTO_REFRESH_MS = 5000;
 
   const state = {
     supabase: null,
@@ -260,6 +261,8 @@
     search: '',
     loadingSection: false,
     loadingSupportMessages: false,
+    supportAutoRefreshTimer: null,
+    refreshingSupport: false,
   };
 
   const authSessionStorage = createScopedSessionStorage();
@@ -2128,6 +2131,9 @@
   async function loadSection(sectionName) {
     state.activeSection = sectionName;
     state.selectedRowIds.clear();
+    if (sectionName !== 'support') {
+      stopSupportAutoRefresh();
+    }
     renderMenu();
     state.loadingSection = true;
     renderTable();
@@ -2174,6 +2180,9 @@
       }
       state.loadingSection = false;
       renderTable();
+      if (sectionName === 'support') {
+        startSupportAutoRefresh();
+      }
     } catch (error) {
       state.loadingSection = false;
       renderTable();
@@ -2687,6 +2696,59 @@
     }
   }
 
+  function startSupportAutoRefresh() {
+    stopSupportAutoRefresh();
+    state.supportAutoRefreshTimer = window.setInterval(() => {
+      refreshSupportQuietly().catch((error) => {
+        console.warn('Support auto-refresh failed', error);
+      });
+    }, SUPPORT_AUTO_REFRESH_MS);
+  }
+
+  function stopSupportAutoRefresh() {
+    if (state.supportAutoRefreshTimer) {
+      window.clearInterval(state.supportAutoRefreshTimer);
+      state.supportAutoRefreshTimer = null;
+    }
+    state.refreshingSupport = false;
+  }
+
+  async function refreshSupportQuietly() {
+    if (
+      state.activeSection !== 'support' ||
+      state.loadingSection ||
+      state.refreshingSupport
+    ) {
+      return;
+    }
+
+    state.refreshingSupport = true;
+    try {
+      const selectedThreadId = Number(
+        state.supportSelectedThread?.thread_id || state.supportSelectedThread?.id,
+      );
+      const rows = await loadRows(sectionMeta.support);
+      state.support = Array.isArray(rows) ? rows : [];
+
+      if (Number.isFinite(selectedThreadId) && selectedThreadId > 0) {
+        const refreshed = state.support.find(
+          (row) => Number(row.thread_id || row.id) === selectedThreadId,
+        );
+        if (refreshed) {
+          state.supportSelectedThread = refreshed;
+        }
+        const messages = await callRpc('admin_support_list_messages', {
+          p_thread_id: selectedThreadId,
+        });
+        state.supportMessages = Array.isArray(messages) ? messages : [];
+      }
+
+      renderTable();
+    } finally {
+      state.refreshingSupport = false;
+    }
+  }
+
   function renderSupportPanel() {
     const selected = state.supportSelectedThread;
     const hasSelected = !!selected;
@@ -2910,6 +2972,7 @@
       renderSignedOut();
       return;
     }
+    stopSupportAutoRefresh();
     await state.supabase.auth.signOut();
     state.session = null;
     state.admin = null;
@@ -2918,6 +2981,7 @@
   }
 
   function renderSignedOut() {
+    stopSupportAutoRefresh();
     loginView.classList.remove('hidden');
     dashboardView.classList.add('hidden');
     menu.classList.add('hidden');
