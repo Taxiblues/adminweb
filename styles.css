@@ -850,6 +850,10 @@ th {
   border-color: rgba(87, 196, 125, 0.35);
 }
 
+.flash.is-warning {
+  border-color: rgba(245, 197, 66, 0.45);
+}
+
 @media (max-width: 980px) {
   body {
     height: auto;

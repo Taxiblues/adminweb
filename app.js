@@ -2851,17 +2851,33 @@
         p_thread_id: threadId,
         p_body: body,
       });
+      let pushWarning = '';
       if (sent?.id) {
-        invokeEdgeFunction('send-push', {
-          type: 'support_admin_reply_created',
-          support_thread_id: String(threadId),
-          support_message_id: String(sent.id),
-        }).catch((error) => {
+        try {
+          const pushResult = await invokeEdgeFunction('send-push', {
+            type: 'support_admin_reply_created',
+            support_thread_id: String(threadId),
+            support_message_id: String(sent.id),
+          });
+          if (!pushResult || Number(pushResult.sent || 0) <= 0) {
+            const attempted = Array.isArray(pushResult?.notifications)
+              ? pushResult.notifications.reduce(
+                  (total, item) => total + Number(item?.attempted || 0),
+                  0,
+                )
+              : 0;
+            pushWarning = attempted > 0
+              ? ' Push non inviata: FCM non ha confermato la consegna.'
+              : ' Push non inviata: nessun token destinatario trovato.';
+            console.warn('Support reply push returned no deliveries', pushResult);
+          }
+        } catch (error) {
+          pushWarning = ` Push non inviata: ${normalizeError(error)}`;
           console.warn('Support reply push failed', error);
-        });
+        }
       }
       supportReplyInput.value = '';
-      showFlash('Risposta inviata.', 'success');
+      showFlash(`Risposta inviata.${pushWarning}`, pushWarning ? 'warning' : 'success');
       await loadSupportMessages(threadId);
       await loadSection('support');
       const refreshed = state.support.find((row) => Number(row.thread_id) === threadId);
