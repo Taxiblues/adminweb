@@ -167,6 +167,13 @@
     'communicationSendButton',
   );
   const supportPanel = document.getElementById('supportPanel');
+  const supportUserSearchForm = document.getElementById('supportUserSearchForm');
+  const supportUserTypeSelect = document.getElementById('supportUserTypeSelect');
+  const supportUserSearchInput = document.getElementById('supportUserSearchInput');
+  const supportUserSearchButton = document.getElementById('supportUserSearchButton');
+  const supportUserSearchResults = document.getElementById(
+    'supportUserSearchResults',
+  );
   const supportEmptyState = document.getElementById('supportEmptyState');
   const supportConversation = document.getElementById('supportConversation');
   const supportThreadTitle = document.getElementById('supportThreadTitle');
@@ -196,6 +203,10 @@
     blockedWords: [],
     communications: [],
     support: [],
+    supportUserResults: [],
+    supportUserSearchStarted: false,
+    loadingSupportUsers: false,
+    openingSupportUserId: null,
     supportSelectedThread: null,
     supportMessages: [],
     summary: null,
@@ -385,19 +396,6 @@
         { label: 'Email', value: (row) => row.email || '-' },
         { label: 'Telefono', value: (row) => row.phone_e164 || '-' },
         {
-          label: 'Emergenza',
-          value: (row) => row.emergency_contact_phone_e164 || '-',
-        },
-        {
-          label: 'Sicurezza',
-          render: (row) => {
-            const verified = row.phone_verified_at || row.verification_level === 'phone_verified';
-            return `<span class="pill ${verified ? 'is-active' : 'is-warning'}">${
-              verified ? 'Verificato' : 'Telefono raccolto'
-            }</span>`;
-          },
-        },
-        {
           label: 'Stato',
           render: (row) => {
             const isBlocked = row.bloccato === true;
@@ -412,7 +410,6 @@
         row.nickname,
         row.email,
         row.phone_e164,
-        row.emergency_contact_phone_e164,
         row.avatar_url,
         row.foto_moto,
       ],
@@ -449,19 +446,6 @@
         { label: 'Email', value: (row) => row.email || '-' },
         { label: 'Telefono', value: (row) => row.phone_e164 || '-' },
         {
-          label: 'Emergenza',
-          value: (row) => row.emergency_contact_phone_e164 || '-',
-        },
-        {
-          label: 'Sicurezza',
-          render: (row) => {
-            const verified = row.phone_verified_at || row.verification_level === 'phone_verified';
-            return `<span class="pill ${verified ? 'is-active' : 'is-warning'}">${
-              verified ? 'Verificato' : 'Telefono raccolto'
-            }</span>`;
-          },
-        },
-        {
           label: 'Stato',
           render: (row) => {
             const isBlocked = row.bloccato === true;
@@ -476,7 +460,6 @@
         row.nickname,
         row.email,
         row.phone_e164,
-        row.emergency_contact_phone_e164,
         row.avatar_url,
       ],
     },
@@ -717,10 +700,6 @@
         { label: 'Ruolo', value: (row) => formatUserType(row.actor_role) },
         { label: 'Telefono', value: (row) => row.actor_phone_e164 || '-' },
         {
-          label: 'Emergenza',
-          value: (row) => row.actor_emergency_phone_e164 || '-',
-        },
-        {
           label: 'Evento',
           render: (row) =>
             `<span class="pill ${safetyEventTypeClass(row.event_type)}">${escapeHtml(
@@ -746,7 +725,6 @@
         row.ride_id,
         row.actor_nickname,
         row.actor_phone_e164,
-        row.actor_emergency_phone_e164,
         row.event_type,
         row.message,
         row.status,
@@ -1080,7 +1058,7 @@
     support: {
       title: 'Supporto',
       description:
-        'Conversazioni di supporto aperte dagli utenti nell\'app. Gli admin rispondono solo tramite RPC.',
+        'Conversazioni di supporto aperte dagli utenti o avviate individualmente dagli admin tramite RPC.',
       listRpc: 'admin_support_list_threads',
       dataKey: 'support',
       searchPlaceholder: 'Filtra per nickname, email, ruolo, stato o ultimo messaggio',
@@ -2750,6 +2728,7 @@
   }
 
   function renderSupportPanel() {
+    renderSupportUserSearchResults();
     const selected = state.supportSelectedThread;
     const hasSelected = !!selected;
     supportEmptyState.classList.toggle('hidden', hasSelected);
@@ -2770,6 +2749,121 @@
     supportReopenButton.classList.toggle('hidden', status !== 'closed');
 
     renderSupportMessages();
+  }
+
+  function renderSupportUserSearchResults() {
+    supportUserSearchResults.innerHTML = '';
+
+    if (state.loadingSupportUsers) {
+      supportUserSearchResults.textContent = 'Ricerca utenti in corso...';
+      return;
+    }
+
+    if (!state.supportUserSearchStarted) {
+      supportUserSearchResults.textContent =
+        'Inserisci almeno 2 caratteri per cercare un utente.';
+      return;
+    }
+
+    if (!state.supportUserResults.length) {
+      supportUserSearchResults.textContent = 'Nessun utente trovato.';
+      return;
+    }
+
+    state.supportUserResults.forEach((user) => {
+      const row = document.createElement('div');
+      row.className = 'support-user-search-result';
+
+      const details = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = user.user_nickname || 'Utente';
+      const meta = document.createElement('span');
+      meta.textContent = [
+        formatUserType(user.user_type),
+        user.user_email || null,
+        user.active_thread_id ? 'Chat attiva' : 'Nessuna chat attiva',
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      details.append(title, meta);
+
+      const button = document.createElement('button');
+      button.className = user.active_thread_id ? 'ghost-button' : 'primary-button';
+      button.type = 'button';
+      button.textContent = user.active_thread_id ? 'Apri chat' : 'Avvia chat';
+      button.disabled = state.openingSupportUserId === user.user_id;
+      button.addEventListener('click', () => openOrCreateSupportThreadForUser(user));
+
+      row.append(details, button);
+      supportUserSearchResults.appendChild(row);
+    });
+  }
+
+  async function searchSupportUsers(event) {
+    event.preventDefault();
+    const search = supportUserSearchInput.value.trim();
+    if (search.length < 2) {
+      showFlash('Inserisci almeno 2 caratteri per cercare un utente.', 'error');
+      supportUserSearchInput.focus();
+      return;
+    }
+
+    state.supportUserSearchStarted = true;
+    state.loadingSupportUsers = true;
+    state.supportUserResults = [];
+    supportUserSearchButton.disabled = true;
+    supportUserSearchButton.textContent = 'Ricerca...';
+    renderSupportUserSearchResults();
+
+    try {
+      const rows = await callRpc('admin_support_search_users', {
+        p_user_type: supportUserTypeSelect.value,
+        p_search: search,
+        p_limit: 30,
+      });
+      state.supportUserResults = Array.isArray(rows) ? rows : [];
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    } finally {
+      state.loadingSupportUsers = false;
+      supportUserSearchButton.disabled = false;
+      supportUserSearchButton.textContent = 'Cerca utente';
+      renderSupportUserSearchResults();
+    }
+  }
+
+  async function openOrCreateSupportThreadForUser(user) {
+    if (!user?.user_id || state.openingSupportUserId) return;
+    state.openingSupportUserId = user.user_id;
+    renderSupportUserSearchResults();
+
+    try {
+      const thread = await callRpc('admin_support_get_or_create_thread', {
+        p_user_id: user.user_id,
+      });
+      const threadId = Number(thread?.thread_id || thread?.id);
+      if (!Number.isFinite(threadId) || threadId <= 0) {
+        throw new Error('Thread supporto non disponibile.');
+      }
+
+      await loadSection('support');
+      const refreshed = state.support.find(
+        (row) => Number(row.thread_id || row.id) === threadId,
+      );
+      await openSupportThread(refreshed || thread);
+      supportReplyInput.focus();
+      showFlash(
+        user.active_thread_id
+          ? 'Conversazione supporto aperta.'
+          : 'Nuova conversazione supporto pronta per il primo messaggio.',
+        'success',
+      );
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    } finally {
+      state.openingSupportUserId = null;
+      renderSupportUserSearchResults();
+    }
   }
 
   function renderSupportMessages() {
@@ -3243,6 +3337,7 @@
       state.communicationDraft.body = event.target.value;
     });
     communicationSendButton.addEventListener('click', sendCommunicationBroadcast);
+    supportUserSearchForm.addEventListener('submit', searchSupportUsers);
     supportSendButton.addEventListener('click', sendSupportReply);
     supportRefreshButton.addEventListener('click', () => {
       const selected = state.supportSelectedThread;

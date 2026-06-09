@@ -600,6 +600,51 @@ code {
   background: rgba(255, 255, 255, 0.03);
 }
 
+.support-user-picker {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.support-user-search-form {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.45fr) minmax(280px, 1fr) auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.support-user-search-results {
+  display: grid;
+  gap: 10px;
+  color: var(--muted);
+}
+
+.support-user-search-result {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.16);
+  color: var(--text);
+}
+
+.support-user-search-result strong,
+.support-user-search-result span {
+  display: block;
+}
+
+.support-user-search-result span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .support-conversation {
   display: grid;
   gap: 16px;
@@ -885,7 +930,8 @@ th {
   .communications-footer,
   .support-conversation-header,
   .support-status-actions,
-  .support-reply-actions {
+  .support-reply-actions,
+  .support-user-search-result {
     flex-direction: column;
     align-items: stretch;
   }
@@ -900,6 +946,7 @@ th {
   .access-policy-layout,
   .communications-meta-grid,
   .communications-form-grid,
+  .support-user-search-form,
   .events-form,
   .announcements-form,
   .app-update-grid,

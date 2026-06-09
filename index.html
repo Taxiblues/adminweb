@@ -852,12 +852,50 @@
               <div class="blocked-words-header">
                 <p class="eyebrow">Chat supporto</p>
                 <p class="blocked-words-copy">
-                  Apri una conversazione dalla tabella e rispondi agli utenti tramite RPC amministrative.
+                  Apri una conversazione esistente oppure avvia una chat individuale con un biker o passenger.
                 </p>
               </div>
 
+              <div class="support-user-picker">
+                <div>
+                  <p class="eyebrow">Nuova comunicazione individuale</p>
+                  <p class="blocked-words-copy">
+                    Cerca un utente e apri il suo thread supporto attivo. L'invio usa la chat e le notifiche supporto gia presenti nell'app.
+                  </p>
+                </div>
+
+                <form id="supportUserSearchForm" class="support-user-search-form">
+                  <label class="field">
+                    <span>Tipo utente</span>
+                    <select id="supportUserTypeSelect" class="field-select">
+                      <option value="all">Biker e passenger</option>
+                      <option value="biker">Solo biker</option>
+                      <option value="passenger">Solo passenger</option>
+                    </select>
+                  </label>
+
+                  <label class="field">
+                    <span>Nickname, email o UUID</span>
+                    <input
+                      id="supportUserSearchInput"
+                      type="search"
+                      minlength="2"
+                      placeholder="Cerca utente"
+                    />
+                  </label>
+
+                  <button id="supportUserSearchButton" class="primary-button" type="submit">
+                    Cerca utente
+                  </button>
+                </form>
+
+                <div id="supportUserSearchResults" class="support-user-search-results">
+                  Inserisci almeno 2 caratteri per cercare un utente.
+                </div>
+              </div>
+
               <div id="supportEmptyState" class="support-empty-state">
-                Seleziona una chat supporto dall'elenco.
+                Seleziona una chat dall'elenco oppure avvia una comunicazione individuale.
               </div>
 
               <div id="supportConversation" class="support-conversation hidden">
