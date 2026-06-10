@@ -195,6 +195,7 @@
     riders: [],
     passengers: [],
     rides: [],
+    groupRides: [],
     events: [],
     stories: [],
     illeciti: [],
@@ -352,7 +353,7 @@
       appAccessSummaryRpc: 'admin_get_app_access_summary',
       hideSearch: true,
       hideTable: true,
-      metricValue: () => 8,
+      metricValue: () => 10,
       columns: [],
     },
     riders: {
@@ -512,6 +513,57 @@
         row.rider_nickname,
         row.passenger_nickname,
         row.start_location,
+      ],
+    },
+    groupRides: {
+      title: 'Giri di gruppo',
+      description:
+        'Elenco dei giri di gruppo con owner, data di partenza, scadenza e cancellazione amministrativa via RPC.',
+      listRpc: 'admin_list_group_rides',
+      deleteRpc: 'admin_delete_group_rides',
+      deleteParam: 'p_group_ride_ids',
+      deleteButtonLabel: 'Elimina giri selezionati',
+      deleteConfirmSingular:
+        'Confermi la cancellazione del giro di gruppo selezionato?',
+      deleteConfirmPlural: (count) =>
+        `Confermi la cancellazione dei ${count} giri di gruppo selezionati?`,
+      deleteSuccessSingular: '1 giro di gruppo eliminato.',
+      deleteSuccessPlural: (count) => `${count} giri di gruppo eliminati.`,
+      searchPlaceholder:
+        'Filtra per nome giro, owner, ruolo, stato o data di partenza',
+      rowSelectable: true,
+      columns: [
+        { label: 'Nome giro', value: (row) => row.title || '-' },
+        { label: 'Owner', value: (row) => row.owner_nickname || '-' },
+        { label: 'Ruolo owner', value: (row) => formatUserType(row.owner_role) },
+        { label: 'Data di partenza', value: (row) => formatDateTime(row.start_time) },
+        {
+          label: 'Stato',
+          render: (row) =>
+            `<span class="pill ${groupRideStatusClass(row.status)}">${escapeHtml(
+              formatGroupRideStatus(row.status),
+            )}</span>`,
+        },
+        {
+          label: 'Scaduto',
+          render: (row) => {
+            const expired = row.is_expired === true;
+            return `<span class="pill ${expired ? 'is-blocked' : 'is-active'}">${
+              expired ? 'Si' : 'No'
+            }</span>`;
+          },
+        },
+      ],
+      searchText: (row) => [
+        row.id,
+        row.title,
+        row.owner_id,
+        row.owner_nickname,
+        row.owner_role,
+        formatUserType(row.owner_role),
+        row.status,
+        formatGroupRideStatus(row.status),
+        formatDateTime(row.start_time),
       ],
     },
     events: {
@@ -1381,6 +1433,16 @@
         label: 'Numero di uscite completate',
         value: summary.rides_completed ?? 0,
         note: 'Record in rides con status = completed',
+      },
+      {
+        label: 'Numero di giri di gruppo aperti',
+        value: summary.group_rides_open ?? 0,
+        note: 'Giri di gruppo con status = active',
+      },
+      {
+        label: 'Numero di giri di gruppo chiusi',
+        value: summary.group_rides_closed ?? 0,
+        note: 'Giri di gruppo cancellati o completati',
       },
       {
         label: 'Numero utenti bloccati',
@@ -3140,6 +3202,21 @@
     if (normalized === 'completed') {
       return 'is-warning';
     }
+    return 'is-blocked';
+  }
+
+  function formatGroupRideStatus(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'active') return 'Aperto';
+    if (normalized === 'completed') return 'Completato';
+    if (normalized === 'cancelled') return 'Cancellato';
+    return normalized || '-';
+  }
+
+  function groupRideStatusClass(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'active') return 'is-active';
+    if (normalized === 'completed') return 'is-warning';
     return 'is-blocked';
   }
 
