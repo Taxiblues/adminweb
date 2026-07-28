@@ -126,12 +126,36 @@
   const blockedWordsForm = document.getElementById('blockedWordsForm');
   const blockedWordInput = document.getElementById('blockedWordInput');
   const blockedWordAddButton = document.getElementById('blockedWordAddButton');
+  const translationsPanel = document.getElementById('translationsPanel');
+  const translationLocaleCards = document.getElementById('translationLocaleCards');
+  const translationLocaleSelect = document.getElementById('translationLocaleSelect');
+  const translationMissingOnlyToggle = document.getElementById(
+    'translationMissingOnlyToggle',
+  );
+  const translationEditorForm = document.getElementById('translationEditorForm');
+  const translationEditorKey = document.getElementById('translationEditorKey');
+  const translationEditorDescription = document.getElementById(
+    'translationEditorDescription',
+  );
+  const translationReferenceWrap = document.getElementById(
+    'translationReferenceWrap',
+  );
+  const translationReferenceText = document.getElementById(
+    'translationReferenceText',
+  );
+  const translationTextInput = document.getElementById('translationTextInput');
+  const translationCancelButton = document.getElementById(
+    'translationCancelButton',
+  );
+  const translationSaveButton = document.getElementById('translationSaveButton');
   const eventsPanel = document.getElementById('eventsPanel');
   const eventsForm = document.getElementById('eventsForm');
   const eventIdInput = document.getElementById('eventIdInput');
   const eventPosterPathInput = document.getElementById('eventPosterPathInput');
   const eventTitleInput = document.getElementById('eventTitleInput');
-  const eventRegionInput = document.getElementById('eventRegionInput');
+  const eventCountryInput = document.getElementById('eventCountryInput');
+  const eventAdminArea1Input = document.getElementById('eventAdminArea1Input');
+  const eventAdminArea2Input = document.getElementById('eventAdminArea2Input');
   const eventDateInput = document.getElementById('eventDateInput');
   const eventExpiresInput = document.getElementById('eventExpiresInput');
   const eventStatusInput = document.getElementById('eventStatusInput');
@@ -185,6 +209,9 @@
   const supportCloseButton = document.getElementById('supportCloseButton');
   const supportReopenButton = document.getElementById('supportReopenButton');
   const SUPPORT_AUTO_REFRESH_MS = 5000;
+  // Copre ampiamente il catalogo attuale (~1100 chiavi); alzare se il
+  // catalogo dovesse superare questa soglia.
+  const TRANSLATIONS_PAGE_LIMIT = 5000;
 
   const state = {
     supabase: null,
@@ -197,11 +224,20 @@
     rides: [],
     groupRides: [],
     events: [],
+    eventCountries: [],
+    eventAdminAreas1: [],
+    eventAdminAreas2: [],
     stories: [],
     illeciti: [],
     safetyEvents: [],
     blockedUsers: [],
     blockedWords: [],
+    translations: [],
+    translationLocales: [],
+    translationLocale: 'en',
+    translationMissingOnly: false,
+    translationReference: {},
+    translationDraft: null,
     communications: [],
     support: [],
     supportUserResults: [],
@@ -256,7 +292,9 @@
       id: '',
       title: '',
       description: '',
-      regione: '',
+      countryCode: '',
+      adminArea1Id: '',
+      adminArea2Id: '',
       eventDate: '',
       expiresAt: '',
       status: 'active',
@@ -378,7 +416,7 @@
         {
           label: 'Avatar',
           render: (row) =>
-            renderUserImageCell({
+            renderImageCell({
               signedUrl: row.avatar_signed_url,
               imagePath: row.avatar_url,
               label: `Avatar ${row.nickname || 'biker'}`,
@@ -387,7 +425,7 @@
         {
           label: 'Moto',
           render: (row) =>
-            renderUserImageCell({
+            renderImageCell({
               signedUrl: row.moto_signed_url,
               imagePath: row.foto_moto,
               label: `Moto ${row.nickname || 'biker'}`,
@@ -437,7 +475,7 @@
         {
           label: 'Avatar',
           render: (row) =>
-            renderUserImageCell({
+            renderImageCell({
               signedUrl: row.avatar_signed_url,
               imagePath: row.avatar_url,
               label: `Avatar ${row.nickname || 'passenger'}`,
@@ -571,6 +609,7 @@
       description:
         'Gestisci gli eventi pubblicati nell’app con locandina, data evento e scadenza di visibilita.',
       listRpc: 'admin_list_app_events',
+      listFunction: 'admin-list-app-events',
       createRpc: 'admin_create_app_event',
       updateRpc: 'admin_update_app_event',
       deleteRpc: 'admin_delete_app_events',
@@ -585,12 +624,37 @@
       deleteSuccessSingular: '1 evento eliminato.',
       deleteSuccessPlural: (count) => `${count} eventi eliminati.`,
       searchPlaceholder: 'Filtra per titolo, descrizione, regione, stato o link',
-      rowAction: (row) => ({
-        label: 'Modifica',
-        className: 'ghost-button',
-        onClick: () => editEvent(row),
-      }),
+      rowActions: (row) => [
+        ...(row.moderation_status === 'pending_review'
+          ? [
+              {
+                label: 'Approva',
+                className: 'primary-button',
+                onClick: () => approveEvent(row),
+              },
+              {
+                label: 'Rifiuta',
+                className: 'ghost-button',
+                onClick: () => rejectEvent(row),
+              },
+            ]
+          : []),
+        {
+          label: 'Modifica',
+          className: 'ghost-button',
+          onClick: () => editEvent(row),
+        },
+      ],
       columns: [
+        {
+          label: 'Locandina',
+          render: (row) =>
+            renderImageCell({
+              signedUrl: row.poster_signed_url,
+              imagePath: row.poster_image_path,
+              label: `Locandina ${row.title || 'evento'}`,
+            }),
+        },
         { label: 'Titolo', value: (row) => row.title || '-' },
         {
           label: 'Stato',
@@ -599,10 +663,12 @@
               formatEventStatus(row.status),
             )}</span>`,
         },
-        { label: 'Regione', value: (row) => row.regione || '-' },
+        { label: 'Stato', value: (row) => row.country_code || '-' },
+        { label: 'Area', value: (row) => row.admin_area_1_name || row.regione || '-' },
+        { label: 'Autore', value: (row) => row.author_nickname || '-' },
+        { label: 'Moderazione', value: (row) => row.moderation_status || '-' },
         { label: 'Data evento', value: (row) => formatDateTime(row.event_date) },
         { label: 'Scadenza', value: (row) => formatDateTime(row.expires_at) },
-        { label: 'Locandina', value: (row) => row.poster_image_path || '-' },
         { label: 'Link', value: (row) => row.external_url || '-' },
         { label: 'Azione', className: 'actions-col', action: true },
       ],
@@ -610,6 +676,10 @@
         row.title,
         row.description,
         row.regione,
+        row.country_code,
+        row.admin_area_1_name,
+        row.author_nickname,
+        row.moderation_status,
         row.status,
         row.poster_image_path,
         row.external_url,
@@ -1145,6 +1215,46 @@
         row.last_message_body,
       ],
     },
+    translations: {
+      title: 'Traduzioni',
+      description:
+        'Cataloghi multilingua dell\'app: revisiona i testi per lingua, individua le chiavi mancanti e pubblica i bundle via RPC.',
+      listRpc: 'admin_translations_list',
+      searchPlaceholder: 'Filtra per chiave, namespace o testo',
+      extraFilter: (row) =>
+        !state.translationMissingOnly || row.text == null,
+      rowAction: (row) => ({
+        label: row.text == null ? 'Traduci' : 'Modifica',
+        className: row.text == null ? 'primary-button' : 'ghost-button',
+        onClick: () => editTranslation(row),
+      }),
+      columns: [
+        {
+          label: 'Chiave',
+          className: 'translation-key-col',
+          render: (row) => `<code>${escapeHtml(row.key)}</code>`,
+        },
+        { label: 'Namespace', value: (row) => row.namespace || '-' },
+        {
+          label: 'Testo',
+          className: 'translation-text-col',
+          value: (row) => truncateText(row.text, 120),
+        },
+        {
+          label: 'Stato',
+          render: (row) =>
+            `<span class="pill ${row.text == null ? 'is-blocked' : 'is-active'}">${
+              row.text == null ? 'Mancante' : 'Tradotta'
+            }</span>`,
+        },
+        {
+          label: 'Aggiornata il',
+          value: (row) => formatDateTime(row.translation_updated_at),
+        },
+        { label: 'Azione', className: 'actions-col', action: true },
+      ],
+      searchText: (row) => [row.key, row.namespace, row.text, row.description],
+    },
   };
 
   function showFlash(message, variant) {
@@ -1174,8 +1284,11 @@
   }
 
   function getFilteredRows() {
-    const rows = getCurrentRows();
+    let rows = getCurrentRows();
     const meta = sectionMeta[state.activeSection];
+    if (typeof meta.extraFilter === 'function') {
+      rows = rows.filter(meta.extraFilter);
+    }
     const query = state.search.trim().toLowerCase();
     if (!query) return rows;
     return rows.filter((row) =>
@@ -1263,6 +1376,7 @@
     const isCommunicationsSection = state.activeSection === 'communications';
     const isSupportSection = state.activeSection === 'support';
     const isEventsSection = state.activeSection === 'events';
+    const isTranslationsSection = state.activeSection === 'translations';
     const rows = getFilteredRows();
 
     sectionTitle.textContent = meta.title;
@@ -1281,6 +1395,7 @@
     blockedWordsPanel.classList.toggle('hidden', !isBlockedWordsSection);
     communicationsPanel.classList.toggle('hidden', !isCommunicationsSection);
     supportPanel.classList.toggle('hidden', !isSupportSection);
+    translationsPanel.classList.toggle('hidden', !isTranslationsSection);
     tableHead.parentElement.parentElement.classList.toggle(
       'hidden',
       meta.hideTable === true,
@@ -1295,6 +1410,7 @@
     if (isCommunicationsSection) renderCommunicationsPanel();
     if (isSupportSection) renderSupportPanel();
     if (isEventsSection) renderEventsPanel();
+    if (isTranslationsSection) renderTranslationsPanel();
 
     if (meta.hideTable === true) {
       tableHead.innerHTML = '';
@@ -1352,17 +1468,23 @@
         }
 
         if (column.action) {
-          const action = meta.rowAction ? meta.rowAction(row) : null;
-          if (!action) {
+          const actions = meta.rowActions
+            ? meta.rowActions(row)
+            : meta.rowAction
+            ? [meta.rowAction(row)]
+            : [];
+          if (!actions.length) {
             tr.appendChild(td);
             return;
           }
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.className = action.className || 'ghost-button';
-          button.textContent = action.label || 'Azione';
-          button.addEventListener('click', action.onClick);
-          td.appendChild(button);
+          actions.filter(Boolean).forEach((action) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = action.className || 'ghost-button';
+            button.textContent = action.label || 'Azione';
+            button.addEventListener('click', action.onClick);
+            td.appendChild(button);
+          });
         } else if (column.render) {
           td.innerHTML = column.render(row);
         } else {
@@ -1512,6 +1634,12 @@
     )}`;
   }
 
+  function truncateText(value, max) {
+    if (value == null) return '-';
+    const text = String(value);
+    return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+  }
+
   function formatJsonCell(value) {
     if (value == null) return '-';
     if (typeof value === 'string') return value;
@@ -1608,10 +1736,135 @@
     communicationBodyInput.value = state.communicationDraft.body;
   }
 
+  function fillSelect(select, rows, valueKey, labelForRow, placeholder) {
+    const selected = select.value;
+    select.innerHTML = '';
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = placeholder;
+    select.appendChild(empty);
+    rows.forEach((row) => {
+      const option = document.createElement('option');
+      option.value = String(row[valueKey] ?? '');
+      option.textContent = labelForRow(row);
+      select.appendChild(option);
+    });
+    select.value = selected;
+  }
+
+  async function loadEventAdminAreas1() {
+    const countryCode = state.eventDraft.countryCode;
+    state.eventAdminAreas1 = countryCode
+      ? await callRpc('rpc_geo_list_admin_areas', {
+          p_country_code: countryCode,
+          p_level: 1,
+          p_parent_id: null,
+        })
+      : [];
+    await loadEventAdminAreas2();
+  }
+
+  async function loadEventAdminAreas2() {
+    const countryCode = state.eventDraft.countryCode;
+    const parentId = Number(state.eventDraft.adminArea1Id);
+    state.eventAdminAreas2 =
+      countryCode && Number.isSafeInteger(parentId) && parentId > 0
+        ? await callRpc('rpc_geo_list_admin_areas', {
+            p_country_code: countryCode,
+            p_level: 2,
+            p_parent_id: parentId,
+          })
+        : [];
+  }
+
+  async function sendEventModerationPush(row) {
+    try {
+      const result = await invokeEdgeFunction('send-push', {
+        type: 'app_event_moderated',
+        event_id: String(row.id),
+      });
+      if (Number(result?.sent || 0) > 0) return '';
+
+      const attempted = Array.isArray(result?.notifications)
+        ? result.notifications.reduce(
+            (total, item) => total + Number(item?.attempted || 0),
+            0,
+          )
+        : 0;
+      console.warn('Event moderation push returned no deliveries', result);
+      return attempted > 0
+        ? ' Push non inviata: FCM non ha confermato la consegna.'
+        : ' Push non inviata: nessun token destinatario trovato.';
+    } catch (error) {
+      console.warn('Event moderation push failed', error);
+      return ` Push non inviata: ${normalizeError(error)}`;
+    }
+  }
+
+  async function approveEvent(row) {
+    try {
+      await callRpc('admin_app_event_approve', { p_event_id: Number(row.id) });
+      const pushWarning = await sendEventModerationPush(row);
+      showFlash(
+        `Evento approvato e pubblicato.${pushWarning}`,
+        pushWarning ? 'warning' : 'success',
+      );
+      await loadSection('events');
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    }
+  }
+
+  async function rejectEvent(row) {
+    const reason = window.prompt('Motivo del rifiuto (obbligatorio):', '');
+    if (reason === null) return;
+    if (reason.trim().length < 3) {
+      showFlash('Inserisci un motivo di almeno 3 caratteri.', 'error');
+      return;
+    }
+    try {
+      await callRpc('admin_app_event_reject', {
+        p_event_id: Number(row.id),
+        p_reason: reason.trim(),
+      });
+      const pushWarning = await sendEventModerationPush(row);
+      showFlash(
+        `Evento rifiutato.${pushWarning}`,
+        pushWarning ? 'warning' : 'success',
+      );
+      await loadSection('events');
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    }
+  }
+
   function renderEventsPanel() {
     eventIdInput.value = state.eventDraft.id;
     eventTitleInput.value = state.eventDraft.title;
-    eventRegionInput.value = state.eventDraft.regione;
+    fillSelect(
+      eventCountryInput,
+      state.eventCountries,
+      'country_code',
+      (row) => row.name_it || row.name_en || row.country_code,
+      'Seleziona Stato',
+    );
+    eventCountryInput.value = state.eventDraft.countryCode;
+    fillSelect(
+      eventAdminArea1Input,
+      state.eventAdminAreas1,
+      'id',
+      (row) => row.name,
+      'Seleziona area',
+    );
+    eventAdminArea1Input.value = state.eventDraft.adminArea1Id;
+    fillSelect(
+      eventAdminArea2Input,
+      state.eventAdminAreas2,
+      'id',
+      (row) => row.name,
+      'Nessuna area locale',
+    );
+    eventAdminArea2Input.value = state.eventDraft.adminArea2Id;
     eventDescriptionInput.value = state.eventDraft.description;
     eventDateInput.value = state.eventDraft.eventDate;
     eventExpiresInput.value = state.eventDraft.expiresAt;
@@ -1693,7 +1946,9 @@
       id: '',
       title: '',
       description: '',
-      regione: '',
+      countryCode: state.eventCountries[0]?.country_code || '',
+      adminArea1Id: '',
+      adminArea2Id: '',
       eventDate: '',
       expiresAt: '',
       status: 'active',
@@ -1704,6 +1959,9 @@
     };
     eventPosterInput.value = '';
     renderEventsPanel();
+    loadEventAdminAreas1()
+      .then(renderEventsPanel)
+      .catch((error) => showFlash(normalizeError(error), 'error'));
   }
 
   function resetAdForm() {
@@ -1731,7 +1989,7 @@
     renderAdsPanel();
   }
 
-  function editEvent(row) {
+  async function editEvent(row) {
     const objectUrl = state.eventDraft.posterPreviewUrl || '';
     if (objectUrl.startsWith('blob:')) {
       URL.revokeObjectURL(objectUrl);
@@ -1740,7 +1998,9 @@
       id: String(row.id || ''),
       title: row.title || '',
       description: row.description || '',
-      regione: row.regione || '',
+      countryCode: row.country_code || 'IT',
+      adminArea1Id: String(row.admin_area_1_id || ''),
+      adminArea2Id: String(row.admin_area_2_id || ''),
       eventDate: toDateTimeLocalValue(row.event_date),
       expiresAt: toDateTimeLocalValue(row.expires_at),
       status: ['active', 'hidden'].includes(String(row.status || '').toLowerCase())
@@ -1748,9 +2008,10 @@
         : 'active',
       externalUrl: row.external_url || '',
       posterImagePath: row.poster_image_path || '',
-      posterPreviewUrl: '',
+      posterPreviewUrl: row.poster_signed_url || '',
       posterFile: null,
     };
+    await loadEventAdminAreas1();
     eventPosterInput.value = '';
     renderEventsPanel();
     eventsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1886,7 +2147,9 @@
   function updateEventDraftFromInputs() {
     state.eventDraft.id = eventIdInput.value.trim();
     state.eventDraft.title = eventTitleInput.value.trim();
-    state.eventDraft.regione = eventRegionInput.value.trim();
+    state.eventDraft.countryCode = eventCountryInput.value.trim();
+    state.eventDraft.adminArea1Id = eventAdminArea1Input.value.trim();
+    state.eventDraft.adminArea2Id = eventAdminArea2Input.value.trim();
     state.eventDraft.description = eventDescriptionInput.value.trim();
     state.eventDraft.eventDate = eventDateInput.value;
     state.eventDraft.expiresAt = eventExpiresInput.value;
@@ -1920,9 +2183,9 @@
       eventTitleInput.focus();
       return;
     }
-    if (!state.eventDraft.regione) {
-      showFlash('Seleziona la regione dell\'evento.', 'error');
-      eventRegionInput.focus();
+    if (!state.eventDraft.countryCode || !state.eventDraft.adminArea1Id) {
+      showFlash('Seleziona Stato e area amministrativa dell\'evento.', 'error');
+      eventCountryInput.focus();
       return;
     }
 
@@ -1958,7 +2221,11 @@
       const payload = {
         p_title: state.eventDraft.title,
         p_description: state.eventDraft.description || null,
-        p_regione: state.eventDraft.regione,
+        p_country_code: state.eventDraft.countryCode,
+        p_admin_area_1_id: Number(state.eventDraft.adminArea1Id),
+        p_admin_area_2_id: state.eventDraft.adminArea2Id
+          ? Number(state.eventDraft.adminArea2Id)
+          : null,
         p_event_date: eventDate,
         p_expires_at: expiresAt,
         p_poster_image_path: state.eventDraft.posterImagePath,
@@ -2214,6 +2481,48 @@
       } else if (sectionName === 'rides') {
         const rows = await loadRows(meta, buildRideFilterPayload());
         state.rides = Array.isArray(rows) ? rows : [];
+      } else if (sectionName === 'events') {
+        const [rows, countries] = await Promise.all([
+          loadRows(meta),
+          callRpc('rpc_geo_list_enabled_countries'),
+        ]);
+        state.events = Array.isArray(rows) ? rows : [];
+        state.eventCountries = Array.isArray(countries) ? countries : [];
+        if (!state.eventDraft.countryCode) {
+          state.eventDraft.countryCode =
+            state.eventCountries.find((row) => row.country_code === 'IT')?.country_code ||
+            state.eventCountries[0]?.country_code ||
+            '';
+        }
+        await loadEventAdminAreas1();
+      } else if (sectionName === 'translations') {
+        const locales = await callRpc('admin_locales_list');
+        state.translationLocales = Array.isArray(locales) ? locales : [];
+        if (
+          !state.translationLocales.some(
+            (locale) => locale.code === state.translationLocale,
+          )
+        ) {
+          state.translationLocale = state.translationLocales[0]?.code || 'it';
+        }
+        const listPayload = (locale) => ({
+          p_locale: locale,
+          p_search: null,
+          p_missing_only: false,
+          p_limit: TRANSLATIONS_PAGE_LIMIT,
+          p_offset: 0,
+        });
+        const needsReference = state.translationLocale !== 'it';
+        const [rows, referenceRows] = await Promise.all([
+          callRpc(meta.listRpc, listPayload(state.translationLocale)),
+          needsReference ? callRpc(meta.listRpc, listPayload('it')) : Promise.resolve([]),
+        ]);
+        state.translations = Array.isArray(rows) ? rows : [];
+        state.translationReference = {};
+        (Array.isArray(referenceRows) ? referenceRows : []).forEach((row) => {
+          if (row.text != null) state.translationReference[row.key] = row.text;
+        });
+        closeTranslationEditor();
       } else {
         const rows = await loadRows(meta);
         state[sectionName] = Array.isArray(rows) ? rows : [];
@@ -3101,6 +3410,223 @@
     }
   }
 
+  function renderTranslationsPanel() {
+    translationLocaleSelect.innerHTML = '';
+    state.translationLocales.forEach((locale) => {
+      const option = document.createElement('option');
+      option.value = locale.code;
+      option.textContent = `${locale.name} (${locale.code})`;
+      translationLocaleSelect.appendChild(option);
+    });
+    translationLocaleSelect.value = state.translationLocale;
+    translationMissingOnlyToggle.checked = state.translationMissingOnly;
+
+    translationLocaleCards.innerHTML = '';
+    state.translationLocales.forEach((locale) => {
+      const card = document.createElement('article');
+      card.className = 'translation-locale-card';
+
+      const missing = Number(locale.missing_keys || 0);
+      const publishedLabel = locale.published_at
+        ? formatDateTime(locale.published_at)
+        : 'mai pubblicato';
+
+      card.innerHTML = `
+        <div class="translation-locale-card-head">
+          <strong>${escapeHtml(locale.name)} (${escapeHtml(locale.code)})</strong>
+          <span class="pill ${locale.enabled ? 'is-active' : 'is-warning'}">
+            ${locale.enabled ? 'Attiva' : 'Spenta'}
+          </span>
+        </div>
+        <p class="translation-locale-meta">
+          Bundle v${escapeHtml(String(locale.bundle_version ?? 0))} ·
+          ${escapeHtml(publishedLabel)}
+        </p>
+        <p class="translation-locale-meta">
+          ${escapeHtml(String(locale.translated_keys ?? 0))}/${escapeHtml(
+            String(locale.total_keys ?? 0),
+          )} chiavi tradotte ·
+          <span class="${missing > 0 ? 'is-danger-text' : 'is-success-text'}">
+            ${escapeHtml(String(missing))} mancanti
+          </span>
+        </p>
+      `;
+
+      const actions = document.createElement('div');
+      actions.className = 'translation-locale-actions';
+
+      const toggleButton = document.createElement('button');
+      toggleButton.type = 'button';
+      toggleButton.className = 'ghost-button';
+      toggleButton.textContent = locale.enabled ? 'Disabilita' : 'Abilita';
+      toggleButton.addEventListener('click', () =>
+        toggleTranslationLocaleEnabled(locale),
+      );
+      actions.appendChild(toggleButton);
+
+      const publishButton = document.createElement('button');
+      publishButton.type = 'button';
+      publishButton.className = 'primary-button';
+      publishButton.textContent = 'Pubblica bundle';
+      publishButton.addEventListener('click', () =>
+        publishTranslationBundle(locale),
+      );
+      actions.appendChild(publishButton);
+
+      card.appendChild(actions);
+      translationLocaleCards.appendChild(card);
+    });
+
+    renderTranslationEditor();
+  }
+
+  function renderTranslationEditor() {
+    const draft = state.translationDraft;
+    translationEditorForm.classList.toggle('hidden', !draft);
+    if (!draft) return;
+
+    translationEditorKey.textContent = `${draft.key} · ${state.translationLocale}`;
+    translationEditorDescription.textContent = draft.description || '';
+    translationEditorDescription.classList.toggle('hidden', !draft.description);
+
+    const reference = state.translationReference[draft.key];
+    translationReferenceWrap.classList.toggle('hidden', reference == null);
+    translationReferenceText.textContent = reference || '';
+  }
+
+  function editTranslation(row) {
+    state.translationDraft = {
+      key: row.key,
+      description: row.description || '',
+    };
+    renderTranslationEditor();
+    translationTextInput.value = row.text || '';
+    translationTextInput.focus();
+  }
+
+  function closeTranslationEditor() {
+    state.translationDraft = null;
+    translationTextInput.value = '';
+    translationEditorForm.classList.add('hidden');
+  }
+
+  function extractPlaceholders(text) {
+    const found = String(text || '').match(/\{[a-zA-Z0-9_]+\}/g) || [];
+    return [...new Set(found)].sort();
+  }
+
+  async function refreshTranslationLocales() {
+    const locales = await callRpc('admin_locales_list');
+    state.translationLocales = Array.isArray(locales) ? locales : [];
+  }
+
+  async function saveTranslation(event) {
+    event.preventDefault();
+    const draft = state.translationDraft;
+    if (!draft) return;
+
+    const text = translationTextInput.value;
+    if (!text.trim()) {
+      showFlash('Il testo della traduzione non puo essere vuoto.', 'error');
+      translationTextInput.focus();
+      return;
+    }
+
+    const reference = state.translationReference[draft.key];
+    if (reference != null) {
+      const expected = extractPlaceholders(reference);
+      const actual = extractPlaceholders(text);
+      if (expected.join(',') !== actual.join(',')) {
+        const proceed = window.confirm(
+          `Attenzione: i placeholder non coincidono con il testo italiano.\n` +
+            `Attesi: ${expected.join(', ') || '(nessuno)'}\n` +
+            `Trovati: ${actual.join(', ') || '(nessuno)'}\n\nSalvare comunque?`,
+        );
+        if (!proceed) return;
+      }
+    }
+
+    translationSaveButton.disabled = true;
+    translationSaveButton.textContent = 'Salvataggio...';
+
+    try {
+      await callRpc('admin_translations_upsert', {
+        p_key: draft.key,
+        p_locale: state.translationLocale,
+        p_text: text,
+      });
+      const row = state.translations.find((item) => item.key === draft.key);
+      if (row) {
+        row.text = text;
+        row.translation_updated_at = new Date().toISOString();
+      }
+      if (state.translationLocale === 'it') {
+        state.translationReference[draft.key] = text;
+      }
+      await refreshTranslationLocales();
+      closeTranslationEditor();
+      showFlash(
+        `Traduzione salvata (${draft.key}, ${state.translationLocale}). ` +
+          'Ricordati di pubblicare il bundle per renderla visibile alle app.',
+        'success',
+      );
+      renderTable();
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+      translationTextInput.focus();
+    } finally {
+      translationSaveButton.disabled = false;
+      translationSaveButton.textContent = 'Salva traduzione';
+    }
+  }
+
+  async function publishTranslationBundle(locale) {
+    const missing = Number(locale.missing_keys || 0);
+    const warning = missing > 0
+      ? `\nAttenzione: ${missing} chiavi sono ancora senza traduzione (i client useranno il fallback).`
+      : '';
+    const proceed = window.confirm(
+      `Pubblicare il bundle "${locale.code}"? I client riceveranno i testi correnti al prossimo avvio.${warning}`,
+    );
+    if (!proceed) return;
+
+    try {
+      const version = await callRpc('admin_publish_translation_bundle', {
+        p_locale: locale.code,
+      });
+      await refreshTranslationLocales();
+      renderTranslationsPanel();
+      showFlash(`Bundle "${locale.code}" pubblicato: versione ${version}.`, 'success');
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    }
+  }
+
+  async function toggleTranslationLocaleEnabled(locale) {
+    const enabling = locale.enabled !== true;
+    const message = enabling
+      ? `Abilitare la lingua "${locale.code}"? I device in questa lingua inizieranno a ricevere il bundle pubblicato.`
+      : `Disabilitare la lingua "${locale.code}"? I device torneranno al fallback (catalogo bundled).`;
+    if (!window.confirm(message)) return;
+
+    try {
+      await callRpc('admin_locales_upsert', {
+        p_code: locale.code,
+        p_name: locale.name,
+        p_enabled: enabling,
+        p_fallback_locale: locale.fallback_locale,
+      });
+      await refreshTranslationLocales();
+      renderTranslationsPanel();
+      showFlash(
+        `Lingua "${locale.code}" ${enabling ? 'abilitata' : 'disabilitata'}.`,
+        'success',
+      );
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    }
+  }
+
   async function handleLogin(event) {
     event.preventDefault();
     if (!state.supabase) {
@@ -3265,7 +3791,7 @@
     `;
   }
 
-  function renderUserImageCell({ signedUrl, imagePath, label }) {
+  function renderImageCell({ signedUrl, imagePath, label }) {
     const normalizedSignedUrl = String(signedUrl || '').trim();
     const normalizedPath = String(imagePath || '').trim();
     if (!normalizedSignedUrl) {
@@ -3275,11 +3801,11 @@
       <a class="story-image-link" href="${escapeHtml(
         normalizedSignedUrl,
       )}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(
-        normalizedPath || label || 'Immagine utente',
+        normalizedPath || label || 'Immagine',
       )}">
         <img class="story-image-thumb" src="${escapeHtml(
           normalizedSignedUrl,
-        )}" alt="${escapeHtml(label || 'Immagine utente')}" loading="lazy" />
+        )}" alt="${escapeHtml(label || 'Immagine')}" loading="lazy" />
       </a>
     `;
   }
@@ -3383,8 +3909,34 @@
     adsForm.addEventListener('submit', saveAd);
     adResetButton.addEventListener('click', resetAdForm);
     blockedWordsForm.addEventListener('submit', addBlockedWord);
+    translationEditorForm.addEventListener('submit', saveTranslation);
+    translationCancelButton.addEventListener('click', closeTranslationEditor);
+    translationLocaleSelect.addEventListener('change', (event) => {
+      state.translationLocale = event.target.value;
+      loadSection('translations');
+    });
+    translationMissingOnlyToggle.addEventListener('change', (event) => {
+      state.translationMissingOnly = event.target.checked;
+      renderTable();
+    });
     eventsForm.addEventListener('submit', saveEvent);
     eventResetButton.addEventListener('click', resetEventForm);
+    eventCountryInput.addEventListener('change', async () => {
+      state.eventDraft.countryCode = eventCountryInput.value;
+      state.eventDraft.adminArea1Id = '';
+      state.eventDraft.adminArea2Id = '';
+      await loadEventAdminAreas1();
+      renderEventsPanel();
+    });
+    eventAdminArea1Input.addEventListener('change', async () => {
+      state.eventDraft.adminArea1Id = eventAdminArea1Input.value;
+      state.eventDraft.adminArea2Id = '';
+      await loadEventAdminAreas2();
+      renderEventsPanel();
+    });
+    eventAdminArea2Input.addEventListener('change', () => {
+      state.eventDraft.adminArea2Id = eventAdminArea2Input.value;
+    });
     eventPosterInput.addEventListener('change', (event) => {
       updateEventDraftFromInputs();
       const file = event.target.files && event.target.files[0];

@@ -364,6 +364,7 @@ code {
 .communications-panel,
 .support-panel,
 .blocked-words-panel,
+.translations-panel,
 .summary-panel {
   display: grid;
   gap: 22px;
@@ -469,6 +470,118 @@ code {
   grid-template-columns: minmax(280px, 1fr) auto;
   gap: 16px;
   align-items: end;
+}
+
+.translation-locale-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.translation-locale-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.translation-locale-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.translation-locale-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.translation-locale-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.translations-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: end;
+}
+
+.translations-missing-toggle {
+  padding-bottom: 10px;
+}
+
+.translation-editor {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(243, 154, 45, 0.28);
+  background: rgba(243, 154, 45, 0.08);
+}
+
+.translation-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.translation-editor-head .eyebrow {
+  margin-bottom: 0;
+}
+
+.translation-editor-head code {
+  font-size: 0.95rem;
+  word-break: break-all;
+}
+
+.translation-editor-description {
+  margin: 0;
+  color: var(--muted);
+}
+
+.translation-reference {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.translation-reference-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.translation-reference p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.translation-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.translation-key-col code {
+  word-break: break-all;
+}
+
+.translation-text-col {
+  max-width: 420px;
 }
 
 .events-form {
@@ -953,6 +1066,8 @@ th {
   .app-update-message-grid,
   .app-update-platform-fields,
   .blocked-words-form,
+  .translations-toolbar,
+  .translation-locale-cards,
   .summary-grid {
     grid-template-columns: 1fr;
   }
