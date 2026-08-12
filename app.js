@@ -228,6 +228,7 @@
     eventAdminAreas1: [],
     eventAdminAreas2: [],
     stories: [],
+    socialStories: [],
     illeciti: [],
     safetyEvents: [],
     blockedUsers: [],
@@ -738,6 +739,90 @@
         row.location_label,
         row.location_full_address,
         row.image_path,
+      ],
+    },
+    socialStories: {
+      title: 'Storie social',
+      description:
+        'Modera le proposte degli utenti e controlla separatamente la pubblicazione sui feed Facebook e Instagram ufficiali.',
+      listRpc: 'admin_list_story_social_submissions',
+      listFunction: 'admin-list-story-social-submissions',
+      searchPlaceholder:
+        'Filtra per titolo, autore, stato di moderazione o pubblicazione',
+      rowActions: (row) => [
+        ...(row.moderation_status === 'pending_review'
+          ? [
+              {
+                label: 'Approva e pubblica',
+                className: 'primary-button',
+                onClick: () => approveStorySocialSubmission(row),
+              },
+              {
+                label: 'Rifiuta',
+                className: 'ghost-button',
+                onClick: () => rejectStorySocialSubmission(row),
+              },
+            ]
+          : []),
+        ...([row.facebook_status, row.instagram_status].some((value) =>
+          ['failed', 'retrying'].includes(String(value || '').toLowerCase()),
+        )
+          ? [
+              {
+                label: 'Riprova canali falliti',
+                className: 'ghost-button',
+                onClick: () => retryStorySocialSubmission(row),
+              },
+            ]
+          : []),
+      ],
+      columns: [
+        {
+          label: 'Immagine',
+          render: (row) => renderStoryImageCell(row),
+        },
+        { label: 'Titolo', value: (row) => row.title || '-' },
+        { label: 'Autore', value: (row) => row.author_nickname || '-' },
+        {
+          label: 'Moderazione',
+          render: (row) =>
+            `<span class="pill ${socialStatusClass(row.moderation_status)}">${escapeHtml(
+              formatSocialModerationStatus(row.moderation_status),
+            )}</span>`,
+        },
+        {
+          label: 'Facebook',
+          render: (row) => renderSocialPublicationStatus(
+            row.facebook_status,
+            row.facebook_permalink,
+            row.facebook_error,
+          ),
+        },
+        {
+          label: 'Instagram',
+          render: (row) => renderSocialPublicationStatus(
+            row.instagram_status,
+            row.instagram_permalink,
+            row.instagram_error,
+          ),
+        },
+        {
+          label: 'Consenso',
+          value: (row) => `${row.consent_version || '-'} · ${row.consent_locale || '-'}`,
+        },
+        { label: 'Scadenza revisione', value: (row) => formatDateTime(row.expires_at) },
+        { label: 'Azione', className: 'actions-col', action: true },
+      ],
+      searchText: (row) => [
+        row.id,
+        row.story_id,
+        row.title,
+        row.description,
+        row.author_nickname,
+        row.author_type,
+        row.moderation_status,
+        row.facebook_status,
+        row.instagram_status,
       ],
     },
     illeciti: {
@@ -1836,6 +1921,106 @@
     } catch (error) {
       showFlash(normalizeError(error), 'error');
     }
+  }
+
+  async function runStorySocialWorker() {
+    const result = await invokeEdgeFunction('publish-story-to-social', {
+      source: 'admin',
+      batch_size: 6,
+    });
+    const results = Array.isArray(result?.results) ? result.results : [];
+    return {
+      claimed: Number(result?.claimed || 0),
+      published: results.filter((item) => item.status === 'published').length,
+      failed: results.filter((item) => item.status !== 'published').length,
+    };
+  }
+
+  async function approveStorySocialSubmission(row) {
+    const initialCaption = String(row.admin_caption || row.suggested_caption || '').trim();
+    const caption = window.prompt(
+      'Caption da pubblicare su Facebook e Instagram (massimo 2200 caratteri):',
+      initialCaption,
+    );
+    if (caption === null) return;
+    if (caption.trim().length < 1 || caption.trim().length > 2200) {
+      showFlash('La caption deve contenere da 1 a 2200 caratteri.', 'error');
+      return;
+    }
+    try {
+      await callRpc('admin_approve_story_social_submission', {
+        p_submission_id: Number(row.id),
+        p_caption: caption.trim(),
+      });
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+      return;
+    }
+
+    try {
+      const worker = await runStorySocialWorker();
+      const warning = worker.failed > 0
+        ? ` ${worker.failed} canali richiedono un nuovo tentativo.`
+        : worker.claimed === 0
+        ? ' La richiesta è in coda e sarà elaborata dal job schedulato.'
+        : '';
+      showFlash(
+        `Richiesta approvata. ${worker.published} pubblicazioni completate.${warning}`,
+        warning ? 'warning' : 'success',
+      );
+    } catch (error) {
+      showFlash(
+        `Richiesta approvata e accodata. Avvio immediato non riuscito: ${normalizeError(error)}`,
+        'warning',
+      );
+    }
+    await loadSection('socialStories');
+  }
+
+  async function rejectStorySocialSubmission(row) {
+    const reason = window.prompt('Motivo del rifiuto (obbligatorio):', '');
+    if (reason === null) return;
+    if (reason.trim().length < 3) {
+      showFlash('Inserisci un motivo di almeno 3 caratteri.', 'error');
+      return;
+    }
+    try {
+      await callRpc('admin_reject_story_social_submission', {
+        p_submission_id: Number(row.id),
+        p_reason: reason.trim(),
+      });
+      showFlash('Proposta social rifiutata.', 'success');
+      await loadSection('socialStories');
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    }
+  }
+
+  async function retryStorySocialSubmission(row) {
+    let queued = 0;
+    try {
+      queued = await callRpc('admin_retry_story_social_publication', {
+        p_submission_id: Number(row.id),
+        p_platform: null,
+      });
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+      return;
+    }
+
+    try {
+      const worker = await runStorySocialWorker();
+      showFlash(
+        `${Number(queued || 0)} canali rimessi in coda; ${worker.published} pubblicati ora.`,
+        worker.failed > 0 ? 'warning' : 'success',
+      );
+    } catch (error) {
+      showFlash(
+        `${Number(queued || 0)} canali rimessi in coda. Avvio immediato non riuscito: ${normalizeError(error)}`,
+        'warning',
+      );
+    }
+    await loadSection('socialStories');
   }
 
   function renderEventsPanel() {
@@ -3774,6 +3959,46 @@
     if (normalized === 'active') return 'is-active';
     if (normalized === 'expired') return 'is-warning';
     return 'is-blocked';
+  }
+
+  function formatSocialModerationStatus(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'pending_review') return 'In revisione';
+    if (normalized === 'approved') return 'Approvata';
+    if (normalized === 'rejected') return 'Rifiutata';
+    if (normalized === 'cancelled') return 'Ritirata';
+    if (normalized === 'expired') return 'Scaduta';
+    return normalized || '-';
+  }
+
+  function formatSocialPublicationStatus(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!normalized) return 'Non avviata';
+    if (normalized === 'queued') return 'In coda';
+    if (normalized === 'processing') return 'In pubblicazione';
+    if (normalized === 'retrying') return 'Retry programmato';
+    if (normalized === 'published') return 'Pubblicata';
+    if (normalized === 'failed') return 'Fallita';
+    return normalized;
+  }
+
+  function socialStatusClass(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'approved' || normalized === 'published') return 'is-active';
+    if (['pending_review', 'queued', 'processing', 'retrying'].includes(normalized)) {
+      return 'is-warning';
+    }
+    return 'is-blocked';
+  }
+
+  function renderSocialPublicationStatus(status, permalink, error) {
+    const label = formatSocialPublicationStatus(status);
+    const normalizedLink = String(permalink || '').trim();
+    const normalizedError = String(error || '').trim();
+    const title = normalizedError ? ` title="${escapeHtml(normalizedError)}"` : '';
+    const pill = `<span class="pill ${socialStatusClass(status)}"${title}>${escapeHtml(label)}</span>`;
+    if (!normalizedLink) return pill;
+    return `<a href="${escapeHtml(normalizedLink)}" target="_blank" rel="noopener noreferrer">${pill}</a>`;
   }
 
   function renderStoryImageCell(row) {
