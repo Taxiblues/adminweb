@@ -1948,30 +1948,6 @@
     };
   }
 
-  async function sendStorySocialApprovalPush(submissionId) {
-    try {
-      const result = await invokeEdgeFunction('send-push', {
-        type: 'story_social_published',
-        submission_id: String(submissionId),
-      });
-      if (Number(result?.sent || 0) > 0) return '';
-
-      const attempted = Array.isArray(result?.notifications)
-        ? result.notifications.reduce(
-            (total, item) => total + Number(item?.attempted || 0),
-            0,
-          )
-        : 0;
-      console.warn('Story social approval push returned no deliveries', result);
-      return attempted > 0
-        ? ' Push non inviata: FCM non ha confermato la consegna.'
-        : ' Push non inviata: nessun token destinatario trovato.';
-    } catch (error) {
-      console.warn('Story social approval push failed', error);
-      return ` Push non inviata: ${normalizeError(error)}`;
-    }
-  }
-
   async function approveStorySocialSubmission(row) {
     const initialCaption = String(row.admin_caption || row.suggested_caption || '').trim();
     const caption = window.prompt(
@@ -1993,7 +1969,6 @@
       return;
     }
 
-    const pushWarning = await sendStorySocialApprovalPush(row.id);
     try {
       const worker = await runStorySocialWorker();
       const warning = worker.failed > 0
@@ -2002,12 +1977,12 @@
         ? ' La richiesta è in coda e sarà elaborata dal job schedulato.'
         : '';
       showFlash(
-        `Richiesta approvata. ${worker.published} pubblicazioni completate.${warning}${pushWarning}`,
-        warning || pushWarning ? 'warning' : 'success',
+        `Richiesta approvata. ${worker.published} pubblicazioni completate.${warning}`,
+        warning ? 'warning' : 'success',
       );
     } catch (error) {
       showFlash(
-        `Richiesta approvata e accodata. Avvio immediato non riuscito: ${normalizeError(error)}${pushWarning}`,
+        `Richiesta approvata e accodata. Avvio immediato non riuscito: ${normalizeError(error)}`,
         'warning',
       );
     }
