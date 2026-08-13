@@ -14,6 +14,9 @@
   const sectionDescription = document.getElementById('sectionDescription');
   const itemsCount = document.getElementById('itemsCount');
   const searchInput = document.getElementById('searchInput');
+  const translationSearchButton = document.getElementById(
+    'translationSearchButton',
+  );
   const refreshButton = document.getElementById('refreshButton');
   const rideFilters = document.getElementById('rideFilters');
   const rideStatusFilter = document.getElementById('rideStatusFilter');
@@ -237,6 +240,7 @@
     translationLocales: [],
     translationLocale: 'en',
     translationMissingOnly: false,
+    translationSearch: '',
     translationReference: {},
     translationDraft: null,
     communications: [],
@@ -1317,9 +1321,7 @@
       description:
         'Cataloghi multilingua dell\'app: revisiona i testi per lingua, individua le chiavi mancanti e pubblica i bundle via RPC.',
       listRpc: 'admin_translations_list',
-      searchPlaceholder: 'Filtra per chiave, namespace o testo',
-      extraFilter: (row) =>
-        !state.translationMissingOnly || row.text == null,
+      searchPlaceholder: 'Cerca una chiave o un testo nel database',
       rowAction: (row) => ({
         label: row.text == null ? 'Traduci' : 'Modifica',
         className: row.text == null ? 'primary-button' : 'ghost-button',
@@ -1386,7 +1388,10 @@
     if (typeof meta.extraFilter === 'function') {
       rows = rows.filter(meta.extraFilter);
     }
-    const query = state.search.trim().toLowerCase();
+    const query =
+      state.activeSection === 'translations'
+        ? ''
+        : state.search.trim().toLowerCase();
     if (!query) return rows;
     return rows.filter((row) =>
       (meta.searchText ? meta.searchText(row) : [row.nickname, row.email]).some((value) =>
@@ -1483,6 +1488,8 @@
       typeof meta.metricValue === 'function' ? meta.metricValue() : rows.length,
     );
     searchInput.closest('.field').classList.toggle('hidden', meta.hideSearch === true);
+    translationSearchButton.classList.toggle('hidden', !isTranslationsSection);
+    translationSearchButton.disabled = isTranslationsSection && state.loadingSection;
     summaryPanel.classList.toggle('hidden', !isSummarySection);
     telemetryPanel.classList.toggle('hidden', !isTelemetrySection);
     appUpdatePanel.classList.toggle('hidden', !isAppUpdatesSection);
@@ -2633,7 +2640,12 @@
   }
 
   async function loadSection(sectionName) {
+    const previousSection = state.activeSection;
     state.activeSection = sectionName;
+    if (previousSection !== sectionName) {
+      searchInput.value =
+        sectionName === 'translations' ? state.translationSearch : state.search;
+    }
     state.selectedRowIds.clear();
     if (sectionName !== 'support') {
       stopSupportAutoRefresh();
@@ -2702,17 +2714,22 @@
         ) {
           state.translationLocale = state.translationLocales[0]?.code || 'it';
         }
-        const listPayload = (locale) => ({
+        const listPayload = (locale, missingOnly) => ({
           p_locale: locale,
-          p_search: null,
-          p_missing_only: false,
+          p_search: state.translationSearch || null,
+          p_missing_only: missingOnly,
           p_limit: TRANSLATIONS_PAGE_LIMIT,
           p_offset: 0,
         });
         const needsReference = state.translationLocale !== 'it';
         const [rows, referenceRows] = await Promise.all([
-          callRpc(meta.listRpc, listPayload(state.translationLocale)),
-          needsReference ? callRpc(meta.listRpc, listPayload('it')) : Promise.resolve([]),
+          callRpc(
+            meta.listRpc,
+            listPayload(state.translationLocale, state.translationMissingOnly),
+          ),
+          needsReference
+            ? callRpc(meta.listRpc, listPayload('it', false))
+            : Promise.resolve([]),
         ]);
         state.translations = Array.isArray(rows) ? rows : [];
         state.translationReference = {};
@@ -4100,8 +4117,18 @@
     logoutButton.addEventListener('click', handleLogout);
     refreshButton.addEventListener('click', () => loadSection(state.activeSection));
     searchInput.addEventListener('input', (event) => {
+      if (state.activeSection === 'translations') return;
       state.search = event.target.value;
       renderTable();
+    });
+    translationSearchButton.addEventListener('click', () => {
+      state.translationSearch = searchInput.value.trim();
+      loadSection('translations');
+    });
+    searchInput.addEventListener('keydown', (event) => {
+      if (state.activeSection !== 'translations' || event.key !== 'Enter') return;
+      event.preventDefault();
+      translationSearchButton.click();
     });
     rideStatusFilter.addEventListener('change', (event) => {
       state.rideFilters.status = event.target.value;
@@ -4154,7 +4181,7 @@
     });
     translationMissingOnlyToggle.addEventListener('change', (event) => {
       state.translationMissingOnly = event.target.checked;
-      renderTable();
+      loadSection('translations');
     });
     eventsForm.addEventListener('submit', saveEvent);
     eventResetButton.addEventListener('click', resetEventForm);
