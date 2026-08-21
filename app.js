@@ -660,7 +660,7 @@
               label: `Locandina ${row.title || 'evento'}`,
             }),
         },
-        { label: 'Titolo', value: (row) => row.title || '-' },
+        { label: 'Titolo', render: (row) => renderEventTitle(row) },
         {
           label: 'Stato',
           render: (row) =>
@@ -1881,34 +1881,45 @@
         : [];
   }
 
-  async function sendEventModerationPush(row) {
-    try {
-      const result = await invokeEdgeFunction('send-push', {
-        type: 'app_event_moderated',
-        event_id: String(row.id),
-      });
-      if (Number(result?.sent || 0) > 0) return '';
-
-      const attempted = Array.isArray(result?.notifications)
-        ? result.notifications.reduce(
-            (total, item) => total + Number(item?.attempted || 0),
-            0,
-          )
-        : 0;
-      console.warn('Event moderation push returned no deliveries', result);
-      return attempted > 0
-        ? ' Push non inviata: FCM non ha confermato la consegna.'
-        : ' Push non inviata: nessun token destinatario trovato.';
-    } catch (error) {
-      console.warn('Event moderation push failed', error);
-      return ` Push non inviata: ${normalizeError(error)}`;
+  async function sendEventModerationPush(row, requestId) {
+    let lastError = '';
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const result = await invokeEdgeFunction('send-push', {
+          type: 'app_event_moderated',
+          event_id: String(row.id),
+          request_id: requestId,
+        });
+        if (Number(result?.sent || 0) > 0) return '';
+        if (result?.status === 'processing') {
+          lastError = 'invio già in elaborazione';
+        } else {
+          const attempted = Array.isArray(result?.notifications)
+            ? result.notifications.reduce(
+                (total, item) => total + Number(item?.attempted || 0),
+                0,
+              )
+            : 0;
+          lastError = attempted > 0
+            ? 'FCM non ha confermato la consegna'
+            : 'nessun token destinatario trovato';
+        }
+        console.warn('Event moderation push returned no deliveries', result);
+      } catch (error) {
+        lastError = normalizeError(error);
+        console.warn('Event moderation push failed', error);
+      }
+      if (attempt < 3) {
+        await new Promise((resolve) => window.setTimeout(resolve, attempt * 750));
+      }
     }
+    return ` Push non inviata dopo 3 tentativi: ${lastError}`;
   }
 
   async function approveEvent(row) {
     try {
       await callRpc('admin_app_event_approve', { p_event_id: Number(row.id) });
-      const pushWarning = await sendEventModerationPush(row);
+      const pushWarning = await sendEventModerationPush(row, crypto.randomUUID());
       showFlash(
         `Evento approvato e pubblicato.${pushWarning}`,
         pushWarning ? 'warning' : 'success',
@@ -1931,7 +1942,7 @@
         p_event_id: Number(row.id),
         p_reason: reason.trim(),
       });
-      const pushWarning = await sendEventModerationPush(row);
+      const pushWarning = await sendEventModerationPush(row, crypto.randomUUID());
       showFlash(
         `Evento rifiutato.${pushWarning}`,
         pushWarning ? 'warning' : 'success',
@@ -1948,10 +1959,15 @@
       batch_size: 6,
     });
     const results = Array.isArray(result?.results) ? result.results : [];
+    const pushNotifications = Array.isArray(result?.push_notifications)
+      ? result.push_notifications
+      : [];
     return {
       claimed: Number(result?.claimed || 0),
       published: results.filter((item) => item.status === 'published').length,
       failed: results.filter((item) => item.status !== 'published').length,
+      pushFailed: pushNotifications.filter((item) => item.status === 'failed').length,
+      pushProcessing: pushNotifications.filter((item) => item.status === 'processing').length,
     };
   }
 
@@ -1980,6 +1996,10 @@
       const worker = await runStorySocialWorker();
       const warning = worker.failed > 0
         ? ` ${worker.failed} canali richiedono un nuovo tentativo.`
+        : worker.pushFailed > 0
+        ? ' Pubblicazione completata, ma la push di conferma sarà ritentata dal job schedulato.'
+        : worker.pushProcessing > 0
+        ? ' La push di conferma è già in elaborazione.'
         : worker.claimed === 0
         ? ' La richiesta è in coda e sarà elaborata dal job schedulato.'
         : '';
@@ -3966,6 +3986,22 @@
     if (normalized === 'hidden') return 'Nascosto';
     if (normalized === 'deleted') return 'Eliminato';
     return normalized || '-';
+  }
+
+  function isEventAgentEvent(row) {
+    const publisherKind = String(row?.publisher_kind || '').trim().toLowerCase();
+    return publisherKind === 'admin' && row?.created_by === null;
+  }
+
+  function renderEventTitle(row) {
+    const title = escapeHtml(row?.title || '-');
+    if (!isEventAgentEvent(row)) return title;
+    return `
+      <div class="event-title-cell">
+        <span class="event-agent-badge" title="Evento proposto automaticamente">Event Agent</span>
+        <span>${title}</span>
+      </div>
+    `;
   }
 
   function eventStatusClass(value) {
