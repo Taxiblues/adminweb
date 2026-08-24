@@ -630,13 +630,17 @@
       deleteSuccessPlural: (count) => `${count} eventi eliminati.`,
       searchPlaceholder: 'Filtra per titolo, descrizione, regione, stato o link',
       rowActions: (row) => [
-        ...(row.moderation_status === 'pending_review'
+        ...(canApproveEvent(row)
           ? [
               {
                 label: 'Approva',
                 className: 'primary-button',
                 onClick: () => approveEvent(row),
               },
+            ]
+          : []),
+        ...(row.moderation_status === 'pending_review'
+          ? [
               {
                 label: 'Rifiuta',
                 className: 'ghost-button',
@@ -3991,6 +3995,16 @@
   function isEventAgentEvent(row) {
     const publisherKind = String(row?.publisher_kind || '').trim().toLowerCase();
     return publisherKind === 'admin' && row?.created_by === null;
+  }
+
+  function canApproveEvent(row) {
+    const moderationStatus = String(row?.moderation_status || '')
+      .trim()
+      .toLowerCase();
+    return (
+      moderationStatus === 'pending_review' ||
+      (moderationStatus === 'draft' && isEventAgentEvent(row))
+    );
   }
 
   function renderEventTitle(row) {
