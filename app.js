@@ -159,6 +159,11 @@
   const eventCountryInput = document.getElementById('eventCountryInput');
   const eventAdminArea1Input = document.getElementById('eventAdminArea1Input');
   const eventAdminArea2Input = document.getElementById('eventAdminArea2Input');
+  const eventAdminArea1Field = document.getElementById('eventAdminArea1Field');
+  const eventAdminArea2Field = document.getElementById('eventAdminArea2Field');
+  const eventResolvedAreas = document.getElementById('eventResolvedAreas');
+  const eventResolvedAreasText = document.getElementById('eventResolvedAreasText');
+  const eventEditAreasButton = document.getElementById('eventEditAreasButton');
   const eventLocationInput = document.getElementById('eventLocationInput');
   const eventLocationSuggestions = document.getElementById(
     'eventLocationSuggestions',
@@ -306,6 +311,9 @@
       countryCode: '',
       adminArea1Id: '',
       adminArea2Id: '',
+      adminArea1Name: '',
+      adminArea2Name: '',
+      areasAutoResolved: false,
       locationLabel: '',
       latitude: '',
       longitude: '',
@@ -2120,6 +2128,19 @@
       'Nessuna area locale',
     );
     eventAdminArea2Input.value = state.eventDraft.adminArea2Id;
+    const areasAutoResolved = Boolean(
+      state.eventDraft.areasAutoResolved && state.eventDraft.adminArea1Id,
+    );
+    eventAdminArea1Field.classList.toggle('hidden', areasAutoResolved);
+    eventAdminArea2Field.classList.toggle('hidden', areasAutoResolved);
+    eventResolvedAreas.classList.toggle('hidden', !areasAutoResolved);
+    eventResolvedAreasText.textContent = [
+      eventCountryInput.selectedOptions[0]?.textContent || state.eventDraft.countryCode,
+      state.eventDraft.adminArea1Name ||
+        eventAdminArea1Input.selectedOptions[0]?.textContent || '',
+      state.eventDraft.adminArea2Name ||
+        eventAdminArea2Input.selectedOptions[0]?.textContent || '',
+    ].filter(Boolean).join(' · ');
     eventLocationInput.value = state.eventDraft.locationLabel;
     eventLatitudeInput.value = state.eventDraft.latitude;
     eventLongitudeInput.value = state.eventDraft.longitude;
@@ -2207,6 +2228,9 @@
       countryCode: state.eventCountries[0]?.country_code || '',
       adminArea1Id: '',
       adminArea2Id: '',
+      adminArea1Name: '',
+      adminArea2Name: '',
+      areasAutoResolved: false,
       locationLabel: '',
       latitude: '',
       longitude: '',
@@ -2263,6 +2287,9 @@
       countryCode: row.country_code || 'IT',
       adminArea1Id: String(row.admin_area_1_id || ''),
       adminArea2Id: String(row.admin_area_2_id || ''),
+      adminArea1Name: row.admin_area_1_name || '',
+      adminArea2Name: row.admin_area_2_name || '',
+      areasAutoResolved: Boolean(row.location_label && row.admin_area_1_id),
       locationLabel: row.location_label || '',
       latitude: row.latitude == null ? '' : String(row.latitude),
       longitude: row.longitude == null ? '' : String(row.longitude),
@@ -2482,6 +2509,7 @@
         action: 'details',
         placeId: suggestion.placeId,
         sessionToken: state.eventLocationSessionToken,
+        countryCode: eventCountryInput.value || 'IT',
       });
       const latitude = Number(result?.latitude);
       const longitude = Number(result?.longitude);
@@ -2492,13 +2520,38 @@
       state.eventDraft.locationLabel = label;
       state.eventDraft.latitude = String(latitude);
       state.eventDraft.longitude = String(longitude);
+      state.eventDraft.adminArea1Id = result?.adminArea1Id == null
+        ? ''
+        : String(result.adminArea1Id);
+      state.eventDraft.adminArea2Id = result?.adminArea2Id == null
+        ? ''
+        : String(result.adminArea2Id);
+      state.eventDraft.adminArea1Name = String(result?.adminArea1Name || '');
+      state.eventDraft.adminArea2Name = String(result?.adminArea2Name || '');
+      state.eventDraft.areasAutoResolved = Boolean(state.eventDraft.adminArea1Id);
       eventLocationInput.value = label;
       eventLatitudeInput.value = String(latitude);
       eventLongitudeInput.value = String(longitude);
       state.eventLocationSessionToken = '';
+      await loadEventAdminAreas1();
+      renderEventsPanel();
+      if (!state.eventDraft.areasAutoResolved) {
+        showFlash(
+          'Indirizzo acquisito, ma le aree non sono state riconosciute. Selezionale manualmente.',
+          'warning',
+        );
+      }
     } catch (error) {
       eventLatitudeInput.value = '';
       eventLongitudeInput.value = '';
+      state.eventDraft.latitude = '';
+      state.eventDraft.longitude = '';
+      state.eventDraft.adminArea1Id = '';
+      state.eventDraft.adminArea2Id = '';
+      state.eventDraft.adminArea1Name = '';
+      state.eventDraft.adminArea2Name = '';
+      state.eventDraft.areasAutoResolved = false;
+      renderEventsPanel();
       showFlash(`Impossibile acquisire le coordinate: ${normalizeError(error)}`, 'error');
     }
   }
@@ -4390,6 +4443,9 @@
       state.eventDraft.countryCode = eventCountryInput.value;
       state.eventDraft.adminArea1Id = '';
       state.eventDraft.adminArea2Id = '';
+      state.eventDraft.adminArea1Name = '';
+      state.eventDraft.adminArea2Name = '';
+      state.eventDraft.areasAutoResolved = false;
       state.eventDraft.locationLabel = '';
       state.eventDraft.latitude = '';
       state.eventDraft.longitude = '';
@@ -4399,17 +4455,29 @@
     eventAdminArea1Input.addEventListener('change', async () => {
       state.eventDraft.adminArea1Id = eventAdminArea1Input.value;
       state.eventDraft.adminArea2Id = '';
+      state.eventDraft.adminArea1Name =
+        eventAdminArea1Input.selectedOptions[0]?.textContent || '';
+      state.eventDraft.adminArea2Name = '';
+      state.eventDraft.areasAutoResolved = false;
       await loadEventAdminAreas2();
       renderEventsPanel();
     });
     eventAdminArea2Input.addEventListener('change', () => {
       state.eventDraft.adminArea2Id = eventAdminArea2Input.value;
+      state.eventDraft.adminArea2Name =
+        eventAdminArea2Input.selectedOptions[0]?.textContent || '';
+      state.eventDraft.areasAutoResolved = false;
+    });
+    eventEditAreasButton.addEventListener('click', () => {
+      state.eventDraft.areasAutoResolved = false;
+      renderEventsPanel();
     });
     eventLocationInput.addEventListener('input', () => {
       eventLatitudeInput.value = '';
       eventLongitudeInput.value = '';
       state.eventDraft.latitude = '';
       state.eventDraft.longitude = '';
+      state.eventDraft.areasAutoResolved = false;
       window.clearTimeout(state.eventLocationSearchTimer);
       state.eventLocationSearchTimer = window.setTimeout(searchEventLocations, 300);
     });

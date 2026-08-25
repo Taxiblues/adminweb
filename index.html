@@ -15,11 +15,11 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>Passengers Admin</title>
-    <link rel="stylesheet" href="./styles.css?v=20260825b" />
+    <link rel="stylesheet" href="./styles.css?v=20260825c" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=20260422a"></script>
     <script defer src="./social-profile-helpers.js?v=20260825a"></script>
-    <script defer src="./app.js?v=20260825b"></script>
+    <script defer src="./app.js?v=20260825c"></script>
   </head>
   <body>
     <div class="admin-shell">
@@ -702,20 +702,6 @@
                   </select>
                 </label>
 
-                <label class="field">
-                  <span>Area amministrativa</span>
-                  <select id="eventAdminArea1Input" class="field-select">
-                    <option value="">Seleziona area</option>
-                  </select>
-                </label>
-
-                <label class="field">
-                  <span>Area locale (facoltativa)</span>
-                  <select id="eventAdminArea2Input" class="field-select">
-                    <option value="">Nessuna area locale</option>
-                  </select>
-                </label>
-
                 <label class="field events-location-field">
                   <span>Indirizzo evento</span>
                   <input
@@ -730,6 +716,30 @@
                     class="event-location-suggestions hidden"
                     role="listbox"
                   ></div>
+                </label>
+
+                <div id="eventResolvedAreas" class="event-resolved-areas hidden">
+                  <div>
+                    <strong>Aree rilevate automaticamente</strong>
+                    <span id="eventResolvedAreasText"></span>
+                  </div>
+                  <button id="eventEditAreasButton" class="ghost-button" type="button">
+                    Modifica
+                  </button>
+                </div>
+
+                <label id="eventAdminArea1Field" class="field">
+                  <span>Area amministrativa</span>
+                  <select id="eventAdminArea1Input" class="field-select">
+                    <option value="">Seleziona area</option>
+                  </select>
+                </label>
+
+                <label id="eventAdminArea2Field" class="field">
+                  <span>Area locale (facoltativa)</span>
+                  <select id="eventAdminArea2Input" class="field-select">
+                    <option value="">Nessuna area locale</option>
+                  </select>
                 </label>
 
                 <label class="field">
