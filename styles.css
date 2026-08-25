@@ -660,6 +660,22 @@ code {
   object-fit: cover;
 }
 
+.social-profile-reference {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 12rem;
+}
+
+.social-profile-value {
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.social-profile-reference small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 .image-empty {
   display: inline-block;
   max-width: 120px;

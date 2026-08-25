@@ -804,6 +804,20 @@
         { label: 'Titolo', value: (row) => row.title || '-' },
         { label: 'Autore', value: (row) => row.author_nickname || '-' },
         {
+          label: 'Account Instagram',
+          render: (row) =>
+            window.PassengersSocialProfile.renderInstagramAccount(
+              row.instagram_username_snapshot,
+            ),
+        },
+        {
+          label: 'Account Facebook',
+          render: (row) =>
+            window.PassengersSocialProfile.renderFacebookAccount(
+              row.facebook_profile_snapshot,
+            ),
+        },
+        {
           label: 'Moderazione',
           render: (row) =>
             `<span class="pill ${socialStatusClass(row.moderation_status)}">${escapeHtml(
@@ -811,7 +825,7 @@
             )}</span>`,
         },
         {
-          label: 'Facebook',
+          label: 'Pubblicazione Facebook',
           render: (row) => renderSocialPublicationStatus(
             row.facebook_status,
             row.facebook_permalink,
@@ -819,7 +833,7 @@
           ),
         },
         {
-          label: 'Instagram',
+          label: 'Pubblicazione Instagram',
           render: (row) => renderSocialPublicationStatus(
             row.instagram_status,
             row.instagram_permalink,
@@ -840,6 +854,8 @@
         row.description,
         row.author_nickname,
         row.author_type,
+        row.instagram_username_snapshot,
+        row.facebook_profile_snapshot,
         row.moderation_status,
         row.facebook_status,
         row.instagram_status,
