@@ -159,6 +159,12 @@
   const eventCountryInput = document.getElementById('eventCountryInput');
   const eventAdminArea1Input = document.getElementById('eventAdminArea1Input');
   const eventAdminArea2Input = document.getElementById('eventAdminArea2Input');
+  const eventLocationInput = document.getElementById('eventLocationInput');
+  const eventLocationSuggestions = document.getElementById(
+    'eventLocationSuggestions',
+  );
+  const eventLatitudeInput = document.getElementById('eventLatitudeInput');
+  const eventLongitudeInput = document.getElementById('eventLongitudeInput');
   const eventDateInput = document.getElementById('eventDateInput');
   const eventExpiresInput = document.getElementById('eventExpiresInput');
   const eventStatusInput = document.getElementById('eventStatusInput');
@@ -300,6 +306,9 @@
       countryCode: '',
       adminArea1Id: '',
       adminArea2Id: '',
+      locationLabel: '',
+      latitude: '',
+      longitude: '',
       eventDate: '',
       expiresAt: '',
       status: 'active',
@@ -308,6 +317,8 @@
       posterPreviewUrl: '',
       posterFile: null,
     },
+    eventLocationSessionToken: '',
+    eventLocationSearchTimer: null,
     selectedRowIds: new Set(),
     rideFilters: {
       status: '',
@@ -2109,6 +2120,9 @@
       'Nessuna area locale',
     );
     eventAdminArea2Input.value = state.eventDraft.adminArea2Id;
+    eventLocationInput.value = state.eventDraft.locationLabel;
+    eventLatitudeInput.value = state.eventDraft.latitude;
+    eventLongitudeInput.value = state.eventDraft.longitude;
     eventDescriptionInput.value = state.eventDraft.description;
     eventDateInput.value = state.eventDraft.eventDate;
     eventExpiresInput.value = state.eventDraft.expiresAt;
@@ -2193,6 +2207,9 @@
       countryCode: state.eventCountries[0]?.country_code || '',
       adminArea1Id: '',
       adminArea2Id: '',
+      locationLabel: '',
+      latitude: '',
+      longitude: '',
       eventDate: '',
       expiresAt: '',
       status: 'active',
@@ -2201,6 +2218,7 @@
       posterPreviewUrl: '',
       posterFile: null,
     };
+    closeEventLocationSuggestions();
     eventPosterInput.value = '';
     renderEventsPanel();
     loadEventAdminAreas1()
@@ -2245,6 +2263,9 @@
       countryCode: row.country_code || 'IT',
       adminArea1Id: String(row.admin_area_1_id || ''),
       adminArea2Id: String(row.admin_area_2_id || ''),
+      locationLabel: row.location_label || '',
+      latitude: row.latitude == null ? '' : String(row.latitude),
+      longitude: row.longitude == null ? '' : String(row.longitude),
       eventDate: toDateTimeLocalValue(row.event_date),
       expiresAt: toDateTimeLocalValue(row.expires_at),
       status: ['active', 'hidden'].includes(String(row.status || '').toLowerCase())
@@ -2394,12 +2415,92 @@
     state.eventDraft.countryCode = eventCountryInput.value.trim();
     state.eventDraft.adminArea1Id = eventAdminArea1Input.value.trim();
     state.eventDraft.adminArea2Id = eventAdminArea2Input.value.trim();
+    state.eventDraft.locationLabel = eventLocationInput.value.trim();
+    state.eventDraft.latitude = eventLatitudeInput.value.trim();
+    state.eventDraft.longitude = eventLongitudeInput.value.trim();
     state.eventDraft.description = eventDescriptionInput.value.trim();
     state.eventDraft.eventDate = eventDateInput.value;
     state.eventDraft.expiresAt = eventExpiresInput.value;
     state.eventDraft.status = eventStatusInput.value || 'active';
     state.eventDraft.externalUrl = eventUrlInput.value.trim();
     state.eventDraft.posterImagePath = eventPosterPathInput.value.trim();
+  }
+
+  function closeEventLocationSuggestions() {
+    eventLocationSuggestions.innerHTML = '';
+    eventLocationSuggestions.classList.add('hidden');
+  }
+
+  function newEventLocationSessionToken() {
+    state.eventLocationSessionToken = crypto.randomUUID();
+    return state.eventLocationSessionToken;
+  }
+
+  async function searchEventLocations() {
+    const input = eventLocationInput.value.trim();
+    if (input.length < 3) {
+      closeEventLocationSuggestions();
+      return;
+    }
+    const sessionToken = state.eventLocationSessionToken || newEventLocationSessionToken();
+    try {
+      const result = await invokeEdgeFunction('admin-place-autocomplete', {
+        action: 'autocomplete',
+        input,
+        countryCode: eventCountryInput.value || 'IT',
+        sessionToken,
+      });
+      if (eventLocationInput.value.trim() !== input) return;
+      const suggestions = Array.isArray(result?.suggestions) ? result.suggestions : [];
+      eventLocationSuggestions.innerHTML = '';
+      suggestions.forEach((suggestion) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'event-location-suggestion';
+        button.setAttribute('role', 'option');
+        const title = document.createElement('strong');
+        title.textContent = suggestion.primaryText || suggestion.fullText || '';
+        const subtitle = document.createElement('small');
+        subtitle.textContent = suggestion.secondaryText || '';
+        button.append(title, subtitle);
+        button.addEventListener('click', () => selectEventLocation(suggestion));
+        eventLocationSuggestions.appendChild(button);
+      });
+      eventLocationSuggestions.classList.toggle('hidden', suggestions.length === 0);
+    } catch (error) {
+      closeEventLocationSuggestions();
+      showFlash(`Autocomplete indirizzo non disponibile: ${normalizeError(error)}`, 'error');
+    }
+  }
+
+  async function selectEventLocation(suggestion) {
+    const fallback = String(suggestion.fullText || suggestion.primaryText || '').trim();
+    eventLocationInput.value = fallback;
+    closeEventLocationSuggestions();
+    try {
+      const result = await invokeEdgeFunction('admin-place-autocomplete', {
+        action: 'details',
+        placeId: suggestion.placeId,
+        sessionToken: state.eventLocationSessionToken,
+      });
+      const latitude = Number(result?.latitude);
+      const longitude = Number(result?.longitude);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        throw new Error('Coordinate non disponibili');
+      }
+      const label = String(result?.formattedAddress || fallback).trim();
+      state.eventDraft.locationLabel = label;
+      state.eventDraft.latitude = String(latitude);
+      state.eventDraft.longitude = String(longitude);
+      eventLocationInput.value = label;
+      eventLatitudeInput.value = String(latitude);
+      eventLongitudeInput.value = String(longitude);
+      state.eventLocationSessionToken = '';
+    } catch (error) {
+      eventLatitudeInput.value = '';
+      eventLongitudeInput.value = '';
+      showFlash(`Impossibile acquisire le coordinate: ${normalizeError(error)}`, 'error');
+    }
   }
 
   function updateAdDraftFromInputs() {
@@ -2430,6 +2531,17 @@
     if (!state.eventDraft.countryCode || !state.eventDraft.adminArea1Id) {
       showFlash('Seleziona Stato e area amministrativa dell\'evento.', 'error');
       eventCountryInput.focus();
+      return;
+    }
+    const latitude = Number(state.eventDraft.latitude);
+    const longitude = Number(state.eventDraft.longitude);
+    if (
+      state.eventDraft.locationLabel.length < 3 ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    ) {
+      showFlash('Cerca e seleziona un indirizzo valido per acquisire le coordinate.', 'error');
+      eventLocationInput.focus();
       return;
     }
 
@@ -2470,6 +2582,9 @@
         p_admin_area_2_id: state.eventDraft.adminArea2Id
           ? Number(state.eventDraft.adminArea2Id)
           : null,
+        p_location_label: state.eventDraft.locationLabel,
+        p_latitude: latitude,
+        p_longitude: longitude,
         p_event_date: eventDate,
         p_expires_at: expiresAt,
         p_poster_image_path: state.eventDraft.posterImagePath,
@@ -2477,19 +2592,39 @@
         p_status: state.eventDraft.status || 'active',
       };
 
+      let savedEvent;
+      const wasEditing = Boolean(state.eventDraft.id);
       if (state.eventDraft.id) {
-        await callRpc(meta.updateRpc, {
+        savedEvent = await callRpc(meta.updateRpc, {
           p_id: Number(state.eventDraft.id),
           ...payload,
         });
-        showFlash('Evento aggiornato.', 'success');
       } else {
-        await callRpc(meta.createRpc, payload);
-        showFlash('Evento creato.', 'success');
+        savedEvent = await callRpc(meta.createRpc, payload);
+      }
+
+      const savedRow = Array.isArray(savedEvent) ? savedEvent[0] : savedEvent;
+      const savedEventId = Number(savedRow?.id || state.eventDraft.id);
+      let publicationPushWarning = '';
+      if (payload.p_status === 'active' && Number.isSafeInteger(savedEventId)) {
+        try {
+          await invokeEdgeFunction('send-push', {
+            type: 'app_event_published',
+            event_id: String(savedEventId),
+            request_id: crypto.randomUUID(),
+          });
+        } catch (error) {
+          console.warn('Event publication push failed', error);
+          publicationPushWarning = ' Push territoriale non confermata: la coda proverà nuovamente l\'invio.';
+        }
       }
 
       resetEventForm();
       await loadSection('events');
+      showFlash(
+        `${wasEditing ? 'Evento aggiornato.' : 'Evento creato.'}${publicationPushWarning}`,
+        publicationPushWarning ? 'warning' : 'success',
+      );
     } catch (error) {
       showFlash(normalizeError(error), 'error');
     } finally {
@@ -4255,6 +4390,9 @@
       state.eventDraft.countryCode = eventCountryInput.value;
       state.eventDraft.adminArea1Id = '';
       state.eventDraft.adminArea2Id = '';
+      state.eventDraft.locationLabel = '';
+      state.eventDraft.latitude = '';
+      state.eventDraft.longitude = '';
       await loadEventAdminAreas1();
       renderEventsPanel();
     });
@@ -4266,6 +4404,17 @@
     });
     eventAdminArea2Input.addEventListener('change', () => {
       state.eventDraft.adminArea2Id = eventAdminArea2Input.value;
+    });
+    eventLocationInput.addEventListener('input', () => {
+      eventLatitudeInput.value = '';
+      eventLongitudeInput.value = '';
+      state.eventDraft.latitude = '';
+      state.eventDraft.longitude = '';
+      window.clearTimeout(state.eventLocationSearchTimer);
+      state.eventLocationSearchTimer = window.setTimeout(searchEventLocations, 300);
+    });
+    eventLocationInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeEventLocationSuggestions();
     });
     eventPosterInput.addEventListener('change', (event) => {
       updateEventDraftFromInputs();
