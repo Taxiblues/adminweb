@@ -222,6 +222,23 @@
   const supportRefreshButton = document.getElementById('supportRefreshButton');
   const supportCloseButton = document.getElementById('supportCloseButton');
   const supportReopenButton = document.getElementById('supportReopenButton');
+  const geoCountriesPanel = document.getElementById('geoCountriesPanel');
+  const geoCountryForm = document.getElementById('geoCountryForm');
+  const geoCountryCodeInput = document.getElementById('geoCountryCodeInput');
+  const geoCountryName = document.getElementById('geoCountryName');
+  const geoCountryReadiness = document.getElementById('geoCountryReadiness');
+  const geoCountryEnabledToggle = document.getElementById(
+    'geoCountryEnabledToggle',
+  );
+  const geoCountryRegistrationToggle = document.getElementById(
+    'geoCountryRegistrationToggle',
+  );
+  const geoCountryArea1RequiredToggle = document.getElementById(
+    'geoCountryArea1RequiredToggle',
+  );
+  const geoCountryArea2RequiredToggle = document.getElementById(
+    'geoCountryArea2RequiredToggle',
+  );
   const SUPPORT_AUTO_REFRESH_MS = 5000;
   // Copre ampiamente il catalogo attuale (~1100 chiavi); alzare se il
   // catalogo dovesse superare questa soglia.
@@ -239,6 +256,8 @@
     groupRides: [],
     events: [],
     eventCountries: [],
+    geoCountries: [],
+    geoCountryDraft: null,
     eventAdminAreas1: [],
     eventAdminAreas2: [],
     stories: [],
@@ -417,6 +436,54 @@
       hideTable: true,
       metricValue: () => 10,
       columns: [],
+    },
+    geoCountries: {
+      title: 'Paesi e registrazione',
+      description:
+        'Controlla copertura GeoNames e disponibilita dei Paesi per le nuove registrazioni.',
+      listRpc: 'admin_geo_countries_list',
+      searchPlaceholder: 'Filtra per Paese, codice o locale',
+      columns: [
+        { label: 'Codice', value: (row) => row.country_code || '-' },
+        { label: 'Paese', value: (row) => row.name_it || row.name_en || '-' },
+        { label: 'Locale', value: (row) => row.canonical_locale || '-' },
+        {
+          label: 'Dataset',
+          render: (row) =>
+            `<span class="pill ${row.dataset_loaded ? 'is-active' : 'is-blocked'}">${
+              row.dataset_loaded ? 'Caricato' : 'Assente'
+            }</span>`,
+        },
+        {
+          label: 'Contenuti geo',
+          render: (row) =>
+            `<span class="pill ${row.enabled ? 'is-active' : 'is-warning'}">${
+              row.enabled ? 'Abilitati' : 'Disabilitati'
+            }</span>`,
+        },
+        {
+          label: 'Registrazione',
+          render: (row) =>
+            `<span class="pill ${row.registration_enabled ? 'is-active' : 'is-warning'}">${
+              row.registration_enabled ? 'Abilitata' : 'Disabilitata'
+            }</span>`,
+        },
+        { label: 'Aree L1', value: (row) => row.admin_area_1_count ?? 0 },
+        { label: 'Aree L2', value: (row) => row.admin_area_2_count ?? 0 },
+        { label: 'Profili', value: (row) => row.profile_count ?? 0 },
+        { label: 'Azione', className: 'actions-col', action: true },
+      ],
+      rowAction: (row) => ({
+        label: 'Configura',
+        className: 'ghost-button',
+        onClick: () => openGeoCountryEditor(row),
+      }),
+      searchText: (row) => [
+        row.country_code,
+        row.name_it,
+        row.name_en,
+        row.canonical_locale,
+      ],
     },
     riders: {
       title: 'Bikers',
@@ -1518,6 +1585,7 @@
     const isSupportSection = state.activeSection === 'support';
     const isEventsSection = state.activeSection === 'events';
     const isTranslationsSection = state.activeSection === 'translations';
+    const isGeoCountriesSection = state.activeSection === 'geoCountries';
     const rows = getFilteredRows();
 
     sectionTitle.textContent = meta.title;
@@ -1538,6 +1606,7 @@
     blockedWordsPanel.classList.toggle('hidden', !isBlockedWordsSection);
     communicationsPanel.classList.toggle('hidden', !isCommunicationsSection);
     supportPanel.classList.toggle('hidden', !isSupportSection);
+    geoCountriesPanel.classList.toggle('hidden', !isGeoCountriesSection);
     translationsPanel.classList.toggle('hidden', !isTranslationsSection);
     tableHead.parentElement.parentElement.classList.toggle(
       'hidden',
@@ -1554,6 +1623,7 @@
     if (isSupportSection) renderSupportPanel();
     if (isEventsSection) renderEventsPanel();
     if (isTranslationsSection) renderTranslationsPanel();
+    if (isGeoCountriesSection) renderGeoCountryPanel();
 
     if (meta.hideTable === true) {
       tableHead.innerHTML = '';
@@ -4366,6 +4436,61 @@
       .replace(/'/g, '&#39;');
   }
 
+  function openGeoCountryEditor(row) {
+    state.geoCountryDraft = row || null;
+    renderGeoCountryPanel();
+    geoCountryForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function renderGeoCountryPanel() {
+    const row = state.geoCountryDraft;
+    geoCountryForm.classList.toggle('hidden', !row);
+    if (!row) return;
+    geoCountryCodeInput.value = row.country_code || '';
+    geoCountryName.textContent = `${row.name_it || row.name_en || row.country_code} (${row.country_code})`;
+    const ready = row.dataset_loaded === true;
+    geoCountryReadiness.textContent = ready
+      ? 'Dataset pronto'
+      : 'Dataset non caricato';
+    geoCountryReadiness.className = `pill ${ready ? 'is-active' : 'is-blocked'}`;
+    geoCountryEnabledToggle.checked = row.enabled === true;
+    geoCountryEnabledToggle.disabled = !ready;
+    geoCountryRegistrationToggle.checked = row.registration_enabled === true;
+    geoCountryRegistrationToggle.disabled = !ready || !row.enabled;
+    geoCountryArea1RequiredToggle.checked = row.admin_area_1_required === true;
+    geoCountryArea2RequiredToggle.checked = row.admin_area_2_required === true;
+  }
+
+  async function saveGeoCountryConfiguration(event) {
+    event.preventDefault();
+    const countryCode = geoCountryCodeInput.value.trim();
+    if (!countryCode) return;
+    if (
+      geoCountryArea2RequiredToggle.checked &&
+      !geoCountryArea1RequiredToggle.checked
+    ) {
+      showFlash(
+        'L’area amministrativa 2 richiede anche l’area amministrativa 1.',
+        'error',
+      );
+      return;
+    }
+    try {
+      await callRpc('admin_geo_country_update_registration', {
+        p_country_code: countryCode,
+        p_enabled: geoCountryEnabledToggle.checked,
+        p_registration_enabled: geoCountryRegistrationToggle.checked,
+        p_admin_area_1_required: geoCountryArea1RequiredToggle.checked,
+        p_admin_area_2_required: geoCountryArea2RequiredToggle.checked,
+      });
+      state.geoCountryDraft = null;
+      showFlash('Configurazione geografica aggiornata.', 'success');
+      await loadSection('geoCountries');
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    }
+  }
+
   function attachEvents() {
     loginForm.addEventListener('submit', handleLogin);
     logoutButton.addEventListener('click', handleLogout);
@@ -4522,6 +4647,19 @@
     });
     supportCloseButton.addEventListener('click', () => updateSupportThreadStatus('closed'));
     supportReopenButton.addEventListener('click', () => updateSupportThreadStatus('open'));
+    geoCountryForm.addEventListener('submit', saveGeoCountryConfiguration);
+    geoCountryEnabledToggle.addEventListener('change', () => {
+      geoCountryRegistrationToggle.disabled =
+        !geoCountryEnabledToggle.checked || geoCountryEnabledToggle.disabled;
+      if (!geoCountryEnabledToggle.checked) {
+        geoCountryRegistrationToggle.checked = false;
+      }
+    });
+    geoCountryArea1RequiredToggle.addEventListener('change', () => {
+      if (!geoCountryArea1RequiredToggle.checked) {
+        geoCountryArea2RequiredToggle.checked = false;
+      }
+    });
   }
 
   function renderEnvironmentBadge() {

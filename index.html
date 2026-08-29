@@ -19,7 +19,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=20260422a"></script>
     <script defer src="./social-profile-helpers.js?v=20260825a"></script>
-    <script defer src="./app.js?v=20260825c"></script>
+    <script defer src="./app.js?v=20260829a"></script>
   </head>
   <body>
     <div class="admin-shell">
@@ -51,6 +51,9 @@
           </button>
           <button class="menu-button" data-section="events" type="button">
             Eventi
+          </button>
+          <button class="menu-button" data-section="geoCountries" type="button">
+            Paesi e registrazione
           </button>
           <button class="menu-button" data-section="stories" type="button">
             Storie
@@ -1015,6 +1018,45 @@
                   </button>
                 </div>
               </div>
+            </div>
+
+            <div id="geoCountriesPanel" class="geo-countries-panel hidden">
+              <div class="blocked-words-header">
+                <p class="eyebrow">Configurazione geografica</p>
+                <p class="blocked-words-copy">
+                  Il caricamento del dataset non abilita automaticamente un Paese. Seleziona
+                  “Configura” nella tabella per decidere se renderlo disponibile in registrazione.
+                </p>
+              </div>
+
+              <form id="geoCountryForm" class="geo-country-form hidden">
+                <input id="geoCountryCodeInput" type="hidden" />
+                <div class="geo-country-heading">
+                  <strong id="geoCountryName">-</strong>
+                  <span id="geoCountryReadiness" class="pill">-</span>
+                </div>
+                <label class="toggle-field">
+                  <input id="geoCountryEnabledToggle" type="checkbox" />
+                  <span>Abilita il Paese per contenuti e funzioni geografiche</span>
+                </label>
+                <label class="toggle-field">
+                  <input id="geoCountryRegistrationToggle" type="checkbox" />
+                  <span>Abilita il Paese per nuove registrazioni</span>
+                </label>
+                <label class="toggle-field">
+                  <input id="geoCountryArea1RequiredToggle" type="checkbox" />
+                  <span>Area amministrativa 1 obbligatoria</span>
+                </label>
+                <label class="toggle-field">
+                  <input id="geoCountryArea2RequiredToggle" type="checkbox" />
+                  <span>Area amministrativa 2 obbligatoria</span>
+                </label>
+                <div class="telemetry-actions">
+                  <button id="geoCountrySaveButton" class="primary-button" type="submit">
+                    Salva configurazione
+                  </button>
+                </div>
+              </form>
             </div>
 
             <div id="tableState" class="table-state hidden"></div>

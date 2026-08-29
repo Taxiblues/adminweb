@@ -1095,6 +1095,27 @@ th {
   color: var(--muted);
 }
 
+.geo-countries-panel {
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--faint);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.geo-country-form {
+  display: grid;
+  gap: 14px;
+}
+
+.geo-country-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .flash {
   position: fixed;
   right: 24px;
