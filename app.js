@@ -52,6 +52,9 @@
     'summaryTelemetrySaveButton',
   );
   const appAccessDayInput = document.getElementById('appAccessDayInput');
+  const appAccessCountrySelect = document.getElementById(
+    'appAccessCountrySelect',
+  );
   const appAccessRefreshButton = document.getElementById(
     'appAccessRefreshButton',
   );
@@ -195,6 +198,9 @@
   const communicationActiveWindowLabel = document.getElementById(
     'communicationActiveWindowLabel',
   );
+  const communicationCountrySelect = document.getElementById(
+    'communicationCountrySelect',
+  );
   const communicationTitleInput = document.getElementById(
     'communicationTitleInput',
   );
@@ -222,6 +228,8 @@
   const supportRefreshButton = document.getElementById('supportRefreshButton');
   const supportCloseButton = document.getElementById('supportCloseButton');
   const supportReopenButton = document.getElementById('supportReopenButton');
+  const friendPostsPanel = document.getElementById('friendPostsPanel');
+  const friendPostsForm = document.getElementById('friendPostsForm');
   const geoCountriesPanel = document.getElementById('geoCountriesPanel');
   const geoCountryForm = document.getElementById('geoCountryForm');
   const geoCountryCodeInput = document.getElementById('geoCountryCodeInput');
@@ -274,6 +282,7 @@
     translationReference: {},
     translationDraft: null,
     communications: [],
+    communicationCountries: [],
     support: [],
     supportUserResults: [],
     supportUserSearchStarted: false,
@@ -285,6 +294,8 @@
     appAccessPolicy: null,
     appAccessSummary: null,
     appAccessSummaryDay: todayDateInputValue(),
+    appAccessSummaryCountryCode: '',
+    appAccessCountries: [],
     telemetry: null,
     telemetryLogs: [],
     appUpdateSettings: null,
@@ -322,6 +333,7 @@
       title: 'Aggiornamento Passengers',
       body: '',
       activeWithinDays: 30,
+      countryCode: '',
     },
     eventDraft: {
       id: '',
@@ -422,6 +434,11 @@
   }
 
   const sectionMeta = {
+    friendPosts: {
+      title: 'Post degli amici',
+      description: 'Limiti di pubblicazione, durata dei post e promemoria giornaliero.',
+      getRpc: 'admin_friend_posts_settings', hideSearch: true, hideTable: true, columns: [],
+    },
     summary: {
       title: 'Summary',
       description:
@@ -1321,7 +1338,7 @@
     communications: {
       title: 'Comunicazioni',
       description:
-        'Invia notifiche push broadcast ai device attivi registrati, separando questo flusso dalle notifiche automatiche dell\'app.',
+        'Invia notifiche push broadcast ai device attivi di uno Stato, separando questo flusso dalle notifiche automatiche dell\'app.',
       getRpc: 'admin_get_push_broadcast_summary',
       listRpc: 'admin_list_push_broadcasts',
       createRpc: 'admin_queue_push_broadcast',
@@ -1575,6 +1592,8 @@
 
   function renderTable() {
     const meta = sectionMeta[state.activeSection];
+    friendPostsPanel.classList.toggle('hidden', state.activeSection !== 'friendPosts');
+    if (state.activeSection === 'friendPosts') renderFriendPostsSettings();
     const isSummarySection = state.activeSection === 'summary';
     const isTelemetrySection = state.activeSection === 'telemetry';
     const isAppUpdatesSection = state.activeSection === 'appUpdates';
@@ -1733,6 +1752,15 @@
     });
     appAccessDayInput.value =
       state.appAccessSummaryDay || accessSummary.day || todayDateInputValue();
+    fillSelect(
+      appAccessCountrySelect,
+      state.appAccessCountries,
+      'country_code',
+      (country) =>
+        `${country.name_it || country.name_en || country.country_code} (${country.country_code})`,
+      'Tutti gli Stati',
+    );
+    appAccessCountrySelect.value = state.appAccessSummaryCountryCode;
     appAccessTotalUsers.textContent = String(accessSummary.total_users ?? 0);
     appAccessBikerUsers.textContent = String(accessSummary.biker_users ?? 0);
     appAccessPassengerUsers.textContent = String(
@@ -1947,6 +1975,16 @@
 
     communicationTitleInput.value = state.communicationDraft.title;
     communicationBodyInput.value = state.communicationDraft.body;
+    fillSelect(
+      communicationCountrySelect,
+      state.communicationCountries,
+      'country_code',
+      (country) =>
+        `${country.name_it || country.name_en || country.country_code} (${country.country_code})`,
+      'Seleziona uno Stato',
+    );
+    communicationCountrySelect.value = state.communicationDraft.countryCode;
+    communicationSendButton.disabled = !state.communicationDraft.countryCode;
   }
 
   function fillSelect(select, rows, valueKey, labelForRow, placeholder) {
@@ -2953,28 +2991,57 @@
     renderTable();
     try {
       const meta = sectionMeta[sectionName];
-      if (sectionName === 'summary') {
-        const [summary, accessPolicy, telemetrySettings, appAccessSummary] = await Promise.all([
+      if (sectionName === 'friendPosts') {
+        state.friendPostsSettings = await callRpc(meta.getRpc);
+      } else if (sectionName === 'summary') {
+        const [summary, accessPolicy, telemetrySettings, countries] = await Promise.all([
           callRpc(meta.getRpc),
           callRpc(meta.accessPolicyGetRpc),
           callRpc(meta.telemetryGetRpc),
-          callRpc(meta.appAccessSummaryRpc, {
-            p_day: state.appAccessSummaryDay || todayDateInputValue(),
-          }),
+          callRpc('admin_geo_countries_list'),
         ]);
         state.summary = summary || null;
         state.appAccessPolicy = accessPolicy || null;
         state.telemetry = telemetrySettings || null;
-        state.appAccessSummary = appAccessSummary || null;
+        state.appAccessCountries = Array.isArray(countries)
+          ? countries.filter((country) => country.enabled === true)
+          : [];
+        if (
+          state.appAccessSummaryCountryCode &&
+          !state.appAccessCountries.some(
+            (country) => country.country_code === state.appAccessSummaryCountryCode,
+          )
+        ) {
+          state.appAccessSummaryCountryCode = '';
+        }
+        state.appAccessSummary =
+          (await callRpc(meta.appAccessSummaryRpc, {
+            p_day: state.appAccessSummaryDay || todayDateInputValue(),
+            p_country_code: state.appAccessSummaryCountryCode || null,
+          })) || null;
       } else if (sectionName === 'communications') {
-        const [summary, rows] = await Promise.all([
-          callRpc(meta.getRpc, {
-            p_active_within_days: state.communicationDraft.activeWithinDays,
-          }),
+        const [rows, countries] = await Promise.all([
           callRpc(meta.listRpc),
+          callRpc('admin_geo_countries_list'),
         ]);
-        state.communicationSummary = summary || null;
         state.communications = Array.isArray(rows) ? rows : [];
+        state.communicationCountries = Array.isArray(countries)
+          ? countries.filter((country) => country.enabled === true)
+          : [];
+        if (
+          state.communicationDraft.countryCode &&
+          !state.communicationCountries.some(
+            (country) => country.country_code === state.communicationDraft.countryCode,
+          )
+        ) {
+          state.communicationDraft.countryCode = '';
+        }
+        state.communicationSummary = state.communicationDraft.countryCode
+          ? await callRpc(meta.getRpc, {
+              p_active_within_days: state.communicationDraft.activeWithinDays,
+              p_target_country_code: state.communicationDraft.countryCode,
+            })
+          : null;
       } else if (sectionName === 'telemetry') {
         const [settings, rows] = await Promise.all([
           callRpc(meta.getRpc),
@@ -3171,12 +3238,14 @@
     const meta = sectionMeta.summary;
     const selectedDay = appAccessDayInput.value || todayDateInputValue();
     state.appAccessSummaryDay = selectedDay;
+    state.appAccessSummaryCountryCode = appAccessCountrySelect.value;
     appAccessRefreshButton.disabled = true;
     appAccessRefreshButton.textContent = 'Caricamento...';
 
     try {
       state.appAccessSummary = await callRpc(meta.appAccessSummaryRpc, {
         p_day: selectedDay,
+        p_country_code: state.appAccessSummaryCountryCode || null,
       });
       renderSummaryPanel();
       showFlash('Accessi app aggiornati.', 'success');
@@ -3449,9 +3518,16 @@
   }
 
   function formatBroadcastTarget(row) {
+    const countryCode = String(row.target_country_code || '').trim().toUpperCase();
+    const country = state.communicationCountries.find(
+      (candidate) => candidate.country_code === countryCode,
+    );
+    const countryLabel = countryCode
+      ? `${country?.name_it || country?.name_en || countryCode} (${countryCode})`
+      : 'Tutti gli Stati (storico)';
     const platform = row.target_platform ? row.target_platform.toUpperCase() : 'Tutti';
     const days = Number(row.active_within_days || 30);
-    return `${platform} · ${days}g`;
+    return `${countryLabel} · ${platform} · ${days}g`;
   }
 
   function describeBroadcastResult(result) {
@@ -3507,6 +3583,13 @@
     const meta = sectionMeta.communications;
     const title = state.communicationDraft.title.trim();
     const body = state.communicationDraft.body.trim();
+    const countryCode = state.communicationDraft.countryCode.trim().toUpperCase();
+
+    if (!countryCode) {
+      showFlash('Seleziona lo Stato destinatario.', 'error');
+      communicationCountrySelect.focus();
+      return;
+    }
 
     if (title.length < 3) {
       showFlash('Inserisci un titolo di almeno 3 caratteri.', 'error');
@@ -3520,8 +3603,12 @@
       return;
     }
 
+    const country = state.communicationCountries.find(
+      (candidate) => candidate.country_code === countryCode,
+    );
+    const countryLabel = country?.name_it || country?.name_en || countryCode;
     const confirmed = window.confirm(
-      `Confermi l'invio della notifica push a tutti i device attivi degli ultimi ${state.communicationDraft.activeWithinDays} giorni?`,
+      `Confermi l'invio della notifica push ai device attivi in ${countryLabel} negli ultimi ${state.communicationDraft.activeWithinDays} giorni?`,
     );
     if (!confirmed) return;
 
@@ -3535,6 +3622,7 @@
         p_title: title,
         p_body: body,
         p_active_within_days: state.communicationDraft.activeWithinDays,
+        p_target_country_code: countryCode,
       });
 
       const result = await invokeEdgeFunction('admin-broadcast-push', {
@@ -4491,7 +4579,39 @@
     }
   }
 
+  function renderFriendPostsSettings() {
+    const settings = state.friendPostsSettings;
+    const controls = friendPostsForm.elements;
+    Array.from(controls).forEach((control) => { control.disabled = state.loadingSection || !settings; });
+    if (!settings) return;
+    controls.dailyLimit.value = settings.daily_limit;
+    controls.lifetimeDays.value = settings.lifetime_days;
+    controls.reminderHour.value = settings.reminder_hour;
+    controls.remindersEnabled.checked = settings.reminders_enabled;
+  }
+
+  async function saveFriendPostsSettings(event) {
+    event.preventDefault();
+    const controls = friendPostsForm.elements;
+    const payload = {
+      p_daily_limit: Number(controls.dailyLimit.value),
+      p_lifetime_days: Number(controls.lifetimeDays.value),
+      p_reminder_hour: Number(controls.reminderHour.value),
+      p_reminders_enabled: controls.remindersEnabled.checked,
+    };
+    Array.from(controls).forEach((control) => { control.disabled = true; });
+    try {
+      state.friendPostsSettings = await callRpc('admin_friend_posts_settings', payload);
+      showFlash('Configurazione post aggiornata.', 'success');
+    } catch (error) {
+      showFlash(normalizeError(error), 'error');
+    } finally {
+      renderFriendPostsSettings();
+    }
+  }
+
   function attachEvents() {
+    friendPostsForm.addEventListener('submit', saveFriendPostsSettings);
     loginForm.addEventListener('submit', handleLogin);
     logoutButton.addEventListener('click', handleLogout);
     refreshButton.addEventListener('click', () => loadSection(state.activeSection));
@@ -4545,6 +4665,7 @@
     );
     appAccessRefreshButton.addEventListener('click', refreshAppAccessSummary);
     appAccessDayInput.addEventListener('change', refreshAppAccessSummary);
+    appAccessCountrySelect.addEventListener('change', refreshAppAccessSummary);
     appAccessSaveButton.addEventListener('click', saveAppAccessPolicy);
     appUpdateSaveButton.addEventListener('click', saveAppUpdateSettings);
     announcementsForm.addEventListener('submit', saveAnnouncement);
@@ -4636,6 +4757,11 @@
     });
     communicationBodyInput.addEventListener('input', (event) => {
       state.communicationDraft.body = event.target.value;
+    });
+    communicationCountrySelect.addEventListener('change', async (event) => {
+      state.communicationDraft.countryCode = event.target.value;
+      state.communicationSummary = null;
+      await loadSection('communications');
     });
     communicationSendButton.addEventListener('click', sendCommunicationBroadcast);
     supportUserSearchForm.addEventListener('submit', searchSupportUsers);

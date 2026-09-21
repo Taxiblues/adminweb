@@ -52,6 +52,7 @@
           <button class="menu-button" data-section="events" type="button">
             Eventi
           </button>
+          <button class="menu-button" data-section="friendPosts" type="button">Post degli amici</button>
           <button class="menu-button" data-section="geoCountries" type="button">
             Paesi e registrazione
           </button>
@@ -624,7 +625,7 @@
                 <div class="blocked-words-header">
                   <p class="eyebrow">Accessi app</p>
                   <p class="blocked-words-copy">
-                    Consulta gli utenti distinti che hanno aperto o ripreso l'app nel giorno selezionato, con distinzione per ruolo attivo.
+                    Consulta gli utenti distinti che hanno aperto o ripreso l'app nel giorno e nello Stato selezionati, con distinzione per ruolo attivo.
                   </p>
                 </div>
 
@@ -632,6 +633,13 @@
                   <label class="field">
                     <span>Giorno</span>
                     <input id="appAccessDayInput" class="field-input" type="date" />
+                  </label>
+
+                  <label class="field">
+                    <span>Stato</span>
+                    <select id="appAccessCountrySelect" class="field-select">
+                      <option value="">Tutti gli Stati</option>
+                    </select>
                   </label>
 
                   <div class="telemetry-meta">
@@ -871,7 +879,7 @@
                 <div class="blocked-words-header">
                   <p class="eyebrow">Broadcast Push</p>
                   <p class="blocked-words-copy">
-                    Invia una notifica breve ai device attivi registrati in <code>device_tokens</code>
+                    Invia una notifica breve ai device attivi di uno Stato specifico,
                     senza toccare il flusso push automatico usato dall'app.
                   </p>
                 </div>
@@ -898,6 +906,13 @@
 
               <div class="communications-form-grid">
                 <label class="field">
+                  <span>Stato destinatario</span>
+                  <select id="communicationCountrySelect" class="field-select" required>
+                    <option value="">Seleziona uno Stato</option>
+                  </select>
+                </label>
+
+                <label class="field">
                   <span>Titolo notifica</span>
                   <input
                     id="communicationTitleInput"
@@ -913,14 +928,14 @@
                     id="communicationBodyInput"
                     rows="4"
                     maxlength="240"
-                    placeholder="Scrivi un testo breve e chiaro da inviare via push a tutti i device attivi"
+                    placeholder="Scrivi un testo breve e chiaro da inviare ai device attivi dello Stato selezionato"
                   ></textarea>
                 </label>
               </div>
 
               <div class="communications-footer">
                 <p class="blocked-words-copy">
-                  Invio ai device con token aggiornato negli ultimi
+                  Invio ai device dello Stato selezionato con token aggiornato negli ultimi
                   <strong id="communicationActiveWindowLabel">30</strong> giorni.
                 </p>
 
@@ -1020,6 +1035,23 @@
               </div>
             </div>
 
+            <div id="friendPostsPanel" class="geo-countries-panel hidden">
+              <form id="friendPostsForm" class="geo-country-form">
+                <p>Configurazione della bacheca privata. I promemoria raggiungono solo gli utenti che li hanno attivati e hanno nuovi post non visualizzati.</p>
+                <label class="field">Post per autore ogni 24 ore
+                  <input name="dailyLimit" type="number" min="1" max="20" required />
+                </label>
+                <label class="field">Durata dei nuovi post (giorni)
+                  <input name="lifetimeDays" type="number" min="1" max="30" required />
+                </label>
+                <label class="field">Ora locale del promemoria (0–23)
+                  <input name="reminderHour" type="number" min="0" max="23" required />
+                </label>
+                <label class="toggle-field"><input name="remindersEnabled" type="checkbox" />Abilita il servizio di promemoria giornaliero</label>
+                <p>Foto: una per post, bucket privato, massimo 1 MB. Le segnalazioni sono nella sezione Illeciti con il riferimento al post.</p>
+                <button class="primary-button" type="submit">Salva configurazione</button>
+              </form>
+            </div>
             <div id="geoCountriesPanel" class="geo-countries-panel hidden">
               <div class="blocked-words-header">
                 <p class="eyebrow">Configurazione geografica</p>
