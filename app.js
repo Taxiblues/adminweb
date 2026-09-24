@@ -264,6 +264,8 @@
     activeSection: 'riders',
     riders: [],
     passengers: [],
+    friendPostsModeration: [],
+    friendPostCountryCode: '',
     userCountries: [],
     userCountryCode: '',
     rides: [],
@@ -444,6 +446,54 @@
       title: 'Post degli amici',
       description: 'Limiti di pubblicazione, durata dei post e promemoria giornaliero.',
       getRpc: 'admin_friend_posts_settings', hideSearch: true, hideTable: true, columns: [],
+    },
+    friendPostsModeration: {
+      title: 'Moderazione post',
+      description:
+        'Controlla i post pubblicati per Paese ed elimina singoli contenuti o selezioni multiple, incluse le immagini associate.',
+      listRpc: 'admin_list_friend_posts',
+      listFunction: 'admin-list-friend-posts',
+      deleteFunction: 'admin-delete-friend-posts',
+      rowSelectable: true,
+      deleteConfirmSingular:
+        'Confermi la cancellazione del post selezionato e dell\'eventuale immagine?',
+      deleteConfirmPlural: (count) =>
+        `Confermi la cancellazione di ${count} post selezionati e delle immagini associate?`,
+      deleteButtonLabel: 'Elimina post',
+      deleteProgressLabel: 'Eliminazione...',
+      deleteSuccessSingular: '1 post eliminato.',
+      deleteSuccessPlural: (count) => `${count} post eliminati.`,
+      searchPlaceholder: 'Filtra per nickname, ruolo, testo, Paese o path immagine',
+      rowAction: (row) => ({
+        label: 'Elimina',
+        className: 'ghost-button',
+        onClick: () => deleteRows([row.id]),
+      }),
+      columns: [
+        { label: 'Nickname', value: (row) => row.nickname || '-' },
+        { label: 'Proposto da', value: (row) => formatUserType(row.author_type) },
+        { label: 'Testo del post', value: (row) => row.body || '-' },
+        {
+          label: 'Immagine',
+          render: (row) =>
+            renderImageCell({
+              signedUrl: row.image_signed_url,
+              imagePath: row.image_path,
+              label: `Immagine post di ${row.nickname || 'utente'}`,
+            }),
+        },
+        { label: 'Pubblicato il', value: (row) => formatDateTime(row.created_at) },
+        { label: 'Paese', value: (row) => formatUserCountry(row.country_code) },
+        { label: 'Azione', className: 'actions-col', action: true },
+      ],
+      searchText: (row) => [
+        row.nickname,
+        formatUserType(row.author_type),
+        row.body,
+        row.image_path,
+        row.country_code,
+        formatUserCountry(row.country_code),
+      ],
     },
     summary: {
       title: 'Summary',
@@ -1529,11 +1579,34 @@
     return name ? `${name} (${normalized})` : normalized;
   }
 
+  function matchesSelectedUserCountry(row) {
+    const selectedCountryCode = String(currentCountryFilterCode() || '')
+      .trim()
+      .toUpperCase();
+    if (!selectedCountryCode) return true;
+    return (
+      String(row?.country_code || '').trim().toUpperCase() === selectedCountryCode
+    );
+  }
+
+  function currentCountryFilterCode() {
+    return state.activeSection === 'friendPostsModeration'
+      ? state.friendPostCountryCode
+      : state.userCountryCode;
+  }
+
   function getFilteredRows() {
     let rows = getCurrentRows();
     const meta = sectionMeta[state.activeSection];
     if (typeof meta.extraFilter === 'function') {
       rows = rows.filter(meta.extraFilter);
+    }
+    if (
+      state.activeSection === 'riders' ||
+      state.activeSection === 'passengers' ||
+      state.activeSection === 'friendPostsModeration'
+    ) {
+      rows = rows.filter(matchesSelectedUserCountry);
     }
     const query =
       state.activeSection === 'translations'
@@ -1577,14 +1650,16 @@
   function renderSectionControls(rows) {
     const meta = sectionMeta[state.activeSection];
     const isRidesSection = state.activeSection === 'rides';
-    const isUserSection =
-      state.activeSection === 'riders' || state.activeSection === 'passengers';
+    const hasCountryFilter =
+      state.activeSection === 'riders' ||
+      state.activeSection === 'passengers' ||
+      state.activeSection === 'friendPostsModeration';
     const supportsBulkActions = meta.rowSelectable === true;
     rideFilters.classList.toggle('hidden', !isRidesSection);
-    userCountryFilterField.classList.toggle('hidden', !isUserSection);
+    userCountryFilterField.classList.toggle('hidden', !hasCountryFilter);
     bulkActions.classList.toggle('hidden', !supportsBulkActions);
 
-    if (isUserSection) {
+    if (hasCountryFilter) {
       fillSelect(
         userCountryFilter,
         state.userCountries,
@@ -1593,7 +1668,7 @@
           `${country.name_it || country.name_en || country.country_code} (${country.country_code})`,
         'Tutti i Paesi',
       );
-      userCountryFilter.value = state.userCountryCode;
+      userCountryFilter.value = currentCountryFilterCode();
       userCountryFilter.disabled = state.loadingSection;
     }
 
@@ -3095,21 +3170,36 @@
       } else if (sectionName === 'rides') {
         const rows = await loadRows(meta, buildRideFilterPayload());
         state.rides = Array.isArray(rows) ? rows : [];
-      } else if (sectionName === 'riders' || sectionName === 'passengers') {
+      } else if (
+        sectionName === 'riders' ||
+        sectionName === 'passengers' ||
+        sectionName === 'friendPostsModeration'
+      ) {
         const countries = await callRpc('admin_geo_countries_list');
         state.userCountries = Array.isArray(countries)
           ? countries.filter((country) => country.enabled === true)
           : [];
+        const selectedCountryCode =
+          sectionName === 'friendPostsModeration'
+            ? state.friendPostCountryCode
+            : state.userCountryCode;
         if (
-          state.userCountryCode &&
+          selectedCountryCode &&
           !state.userCountries.some(
-            (country) => country.country_code === state.userCountryCode,
+            (country) => country.country_code === selectedCountryCode,
           )
         ) {
-          state.userCountryCode = '';
+          if (sectionName === 'friendPostsModeration') {
+            state.friendPostCountryCode = '';
+          } else {
+            state.userCountryCode = '';
+          }
         }
         const rows = await loadRows(meta, {
-          countryCode: state.userCountryCode || null,
+          countryCode:
+            (sectionName === 'friendPostsModeration'
+              ? state.friendPostCountryCode
+              : state.userCountryCode) || null,
         });
         state[sectionName] = Array.isArray(rows) ? rows : [];
       } else if (sectionName === 'events') {
@@ -3220,9 +3310,8 @@
     }
   }
 
-  async function deleteSelectedRows() {
+  async function deleteRows(rowIds) {
     const meta = sectionMeta[state.activeSection];
-    const rowIds = Array.from(state.selectedRowIds);
     if ((!meta.deleteRpc && !meta.deleteFunction) || !rowIds.length) return;
 
     const confirmMessage =
@@ -3269,6 +3358,10 @@
       deleteSelectedButton.textContent = meta.deleteButtonLabel || 'Elimina selezionate';
       deleteSelectedButton.disabled = state.selectedRowIds.size === 0;
     }
+  }
+
+  async function deleteSelectedRows() {
+    await deleteRows(Array.from(state.selectedRowIds));
   }
 
   async function saveTelemetrySettings() {
@@ -4678,7 +4771,12 @@
       renderTable();
     });
     userCountryFilter.addEventListener('change', (event) => {
-      state.userCountryCode = String(event.target.value || '').toUpperCase();
+      const countryCode = String(event.target.value || '').toUpperCase();
+      if (state.activeSection === 'friendPostsModeration') {
+        state.friendPostCountryCode = countryCode;
+      } else {
+        state.userCountryCode = countryCode;
+      }
       loadSection(state.activeSection);
     });
     translationSearchButton.addEventListener('click', () => {
