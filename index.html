@@ -15,11 +15,11 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>Passengers Admin</title>
-    <link rel="stylesheet" href="./styles.css?v=20260825c" />
+    <link rel="stylesheet" href="./styles.css?v=20260924a" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=20260422a"></script>
     <script defer src="./social-profile-helpers.js?v=20260825a"></script>
-    <script defer src="./app.js?v=20260829a"></script>
+    <script defer src="./app.js?v=20260924a"></script>
   </head>
   <body>
     <div class="admin-shell">
@@ -171,6 +171,12 @@
               <label class="field search-field">
                 <span>Cerca</span>
                 <input id="searchInput" type="search" placeholder="Filtra per nickname o email" />
+              </label>
+              <label id="userCountryFilterField" class="field user-country-filter hidden">
+                <span>Paese</span>
+                <select id="userCountryFilter" class="field-select">
+                  <option value="">Tutti i Paesi</option>
+                </select>
               </label>
               <button id="translationSearchButton" class="primary-button hidden" type="button">
                 Cerca

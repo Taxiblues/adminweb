@@ -14,6 +14,10 @@
   const sectionDescription = document.getElementById('sectionDescription');
   const itemsCount = document.getElementById('itemsCount');
   const searchInput = document.getElementById('searchInput');
+  const userCountryFilterField = document.getElementById(
+    'userCountryFilterField',
+  );
+  const userCountryFilter = document.getElementById('userCountryFilter');
   const translationSearchButton = document.getElementById(
     'translationSearchButton',
   );
@@ -260,6 +264,8 @@
     activeSection: 'riders',
     riders: [],
     passengers: [],
+    userCountries: [],
+    userCountryCode: '',
     rides: [],
     groupRides: [],
     events: [],
@@ -511,7 +517,8 @@
       listFunctionPayload: { userType: 'riders' },
       toggleRpc: 'admin_set_rider_blocked',
       toggleParam: 'p_uid',
-      searchPlaceholder: 'Filtra per nickname, email, telefono o path immagine',
+      searchPlaceholder:
+        'Filtra per nickname, email, Paese, telefono o path immagine',
       rowAction: (row) => {
         const isBlocked = row.bloccato === true;
         return {
@@ -541,6 +548,7 @@
         },
         { label: 'Nickname', value: (row) => row.nickname || '-' },
         { label: 'Email', value: (row) => row.email || '-' },
+        { label: 'Paese', value: (row) => formatUserCountry(row.country_code) },
         { label: 'Telefono', value: (row) => row.phone_e164 || '-' },
         {
           label: 'Stato',
@@ -556,6 +564,8 @@
       searchText: (row) => [
         row.nickname,
         row.email,
+        row.country_code,
+        formatUserCountry(row.country_code),
         row.phone_e164,
         row.avatar_url,
         row.foto_moto,
@@ -570,7 +580,8 @@
       listFunctionPayload: { userType: 'passengers' },
       toggleRpc: 'admin_set_passenger_blocked',
       toggleParam: 'p_uid',
-      searchPlaceholder: 'Filtra per nickname, email, telefono o path immagine',
+      searchPlaceholder:
+        'Filtra per nickname, email, Paese, telefono o path immagine',
       rowAction: (row) => {
         const isBlocked = row.bloccato === true;
         return {
@@ -591,6 +602,7 @@
         },
         { label: 'Nickname', value: (row) => row.nickname || '-' },
         { label: 'Email', value: (row) => row.email || '-' },
+        { label: 'Paese', value: (row) => formatUserCountry(row.country_code) },
         { label: 'Telefono', value: (row) => row.phone_e164 || '-' },
         {
           label: 'Stato',
@@ -606,6 +618,8 @@
       searchText: (row) => [
         row.nickname,
         row.email,
+        row.country_code,
+        formatUserCountry(row.country_code),
         row.phone_e164,
         row.avatar_url,
       ],
@@ -1505,6 +1519,16 @@
     return state[dataKey] || [];
   }
 
+  function formatUserCountry(countryCode) {
+    const normalized = String(countryCode || '').trim().toUpperCase();
+    if (!normalized) return '-';
+    const country = state.userCountries.find(
+      (row) => row.country_code === normalized,
+    );
+    const name = country?.name_it || country?.name_en;
+    return name ? `${name} (${normalized})` : normalized;
+  }
+
   function getFilteredRows() {
     let rows = getCurrentRows();
     const meta = sectionMeta[state.activeSection];
@@ -1553,9 +1577,25 @@
   function renderSectionControls(rows) {
     const meta = sectionMeta[state.activeSection];
     const isRidesSection = state.activeSection === 'rides';
+    const isUserSection =
+      state.activeSection === 'riders' || state.activeSection === 'passengers';
     const supportsBulkActions = meta.rowSelectable === true;
     rideFilters.classList.toggle('hidden', !isRidesSection);
+    userCountryFilterField.classList.toggle('hidden', !isUserSection);
     bulkActions.classList.toggle('hidden', !supportsBulkActions);
+
+    if (isUserSection) {
+      fillSelect(
+        userCountryFilter,
+        state.userCountries,
+        'country_code',
+        (country) =>
+          `${country.name_it || country.name_en || country.country_code} (${country.country_code})`,
+        'Tutti i Paesi',
+      );
+      userCountryFilter.value = state.userCountryCode;
+      userCountryFilter.disabled = state.loadingSection;
+    }
 
     if (isRidesSection) {
       rideStatusFilter.value = state.rideFilters.status;
@@ -3055,6 +3095,23 @@
       } else if (sectionName === 'rides') {
         const rows = await loadRows(meta, buildRideFilterPayload());
         state.rides = Array.isArray(rows) ? rows : [];
+      } else if (sectionName === 'riders' || sectionName === 'passengers') {
+        const countries = await callRpc('admin_geo_countries_list');
+        state.userCountries = Array.isArray(countries)
+          ? countries.filter((country) => country.enabled === true)
+          : [];
+        if (
+          state.userCountryCode &&
+          !state.userCountries.some(
+            (country) => country.country_code === state.userCountryCode,
+          )
+        ) {
+          state.userCountryCode = '';
+        }
+        const rows = await loadRows(meta, {
+          countryCode: state.userCountryCode || null,
+        });
+        state[sectionName] = Array.isArray(rows) ? rows : [];
       } else if (sectionName === 'events') {
         const [rows, countries] = await Promise.all([
           loadRows(meta),
@@ -4619,6 +4676,10 @@
       if (state.activeSection === 'translations') return;
       state.search = event.target.value;
       renderTable();
+    });
+    userCountryFilter.addEventListener('change', (event) => {
+      state.userCountryCode = String(event.target.value || '').toUpperCase();
+      loadSection(state.activeSection);
     });
     translationSearchButton.addEventListener('click', () => {
       state.translationSearch = searchInput.value.trim();

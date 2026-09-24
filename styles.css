@@ -313,6 +313,10 @@ code {
   flex: 1;
 }
 
+.user-country-filter {
+  min-width: 240px;
+}
+
 .ride-filters {
   display: grid;
   grid-template-columns: repeat(2, minmax(220px, 280px));
